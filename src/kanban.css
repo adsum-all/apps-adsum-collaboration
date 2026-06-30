@@ -1,0 +1,309 @@
+/* Collaboration: board grid */
+.page-wide {
+  max-width: none;
+}
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.board-tile {
+  text-align: left;
+  background: var(--adsum-panel);
+  border: 1px solid var(--adsum-line);
+  border-radius: var(--adsum-radius-lg);
+  padding: 18px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--adsum-shadow-sm);
+  font-family: inherit;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.board-tile:hover {
+  border-color: var(--adsum-acc);
+  transform: translateY(-2px);
+}
+.board-tile-name {
+  font-family: var(--adsum-font-display);
+  font-weight: 600;
+  font-size: var(--adsum-text-md);
+  color: var(--adsum-ink);
+}
+.board-tile-desc {
+  font-size: var(--adsum-text-sm);
+  color: var(--adsum-mut);
+}
+.board-tile-meta {
+  font-size: var(--adsum-text-xs);
+  color: var(--adsum-faint);
+  margin-top: 4px;
+}
+
+/* Kanban */
+.kanban {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+.kanban-col {
+  flex: 0 0 280px;
+  background: var(--adsum-board);
+  border: 1px solid var(--adsum-line);
+  border-radius: var(--adsum-radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100dvh - 200px);
+}
+.kanban-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: var(--adsum-text-sm);
+  color: var(--adsum-ink2);
+  padding: 2px 4px;
+}
+.kanban-count {
+  background: var(--adsum-panel);
+  border: 1px solid var(--adsum-line);
+  border-radius: var(--adsum-radius-pill);
+  padding: 1px 8px;
+  font-size: var(--adsum-text-xs);
+  color: var(--adsum-mut);
+}
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.kanban-card {
+  background: var(--adsum-panel);
+  border: 1px solid var(--adsum-line);
+  border-radius: var(--adsum-radius-md);
+  box-shadow: var(--adsum-shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+.kanban-card-main {
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: inherit;
+}
+.kanban-card-title {
+  font-size: var(--adsum-text-sm);
+  font-weight: 600;
+  color: var(--adsum-ink);
+}
+.kanban-card-sub {
+  font-size: var(--adsum-text-xs);
+  color: var(--adsum-mut);
+}
+.kanban-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.kanban-card-move {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 8px 8px;
+}
+.kanban-card-move button {
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--adsum-line);
+  background: var(--adsum-bg);
+  color: var(--adsum-mut);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+.kanban-card-move button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.kanban-add {
+  display: flex;
+  gap: 6px;
+}
+.kanban-add input {
+  flex: 1;
+  padding: 9px 11px;
+  border-radius: var(--adsum-radius-md);
+  border: 1px solid var(--adsum-line);
+  background: var(--adsum-panel);
+  color: var(--adsum-ink);
+  font-size: var(--adsum-text-sm);
+  font-family: inherit;
+}
+.kanban-add input:focus {
+  outline: none;
+  border-color: var(--adsum-acc);
+}
+
+/* Card modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 22, 40, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 40;
+}
+.modal {
+  background: var(--adsum-bg);
+  border: 1px solid var(--adsum-line);
+  border-radius: var(--adsum-radius-xl);
+  width: 100%;
+  max-width: 880px;
+  max-height: 90dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--adsum-shadow-lg);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--adsum-line);
+  background: var(--adsum-panel);
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: var(--adsum-text-lg);
+}
+.modal-body {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+.modal-form {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--adsum-text-sm);
+  color: var(--adsum-mut);
+  font-weight: 500;
+}
+.modal-form input,
+.modal-form .textarea {
+  padding: 11px 12px;
+  border-radius: var(--adsum-radius-md);
+  border: 1px solid var(--adsum-line);
+  background: var(--adsum-panel);
+  color: var(--adsum-ink);
+  font-size: var(--adsum-text-sm);
+  font-family: inherit;
+}
+.modal-form input:focus,
+.modal-form .textarea:focus {
+  outline: none;
+  border-color: var(--adsum-acc);
+  box-shadow: 0 0 0 3px rgba(42, 79, 173, 0.12);
+}
+.modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.modal-chat {
+  border-left: 1px solid var(--adsum-line);
+  background: var(--adsum-panel);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  min-height: 0;
+}
+.chat-thread {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.chat-msg {
+  background: var(--adsum-bg);
+  border: 1px solid var(--adsum-line);
+  border-radius: var(--adsum-radius-md);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-author {
+  font-size: var(--adsum-text-xs);
+  font-weight: 600;
+  color: var(--adsum-acc);
+}
+.chat-body {
+  font-size: var(--adsum-text-sm);
+  color: var(--adsum-ink);
+}
+.chat-time {
+  font-size: 10px;
+  color: var(--adsum-faint);
+}
+.chat-input {
+  display: flex;
+  gap: 6px;
+}
+.chat-input input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--adsum-radius-md);
+  border: 1px solid var(--adsum-line);
+  background: var(--adsum-bg);
+  color: var(--adsum-ink);
+  font-size: var(--adsum-text-sm);
+  font-family: inherit;
+}
+.chat-input input:focus {
+  outline: none;
+  border-color: var(--adsum-acc);
+}
+
+@media (max-width: 720px) {
+  .modal-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .modal-chat {
+    border-left: none;
+    border-top: 1px solid var(--adsum-line);
+  }
+}
