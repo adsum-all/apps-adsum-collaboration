@@ -5,11 +5,38 @@ import { Board } from "./components/Board.js";
 import { BoardList } from "./components/BoardList.js";
 import { Login } from "./components/Login.js";
 
+// Persisted session: a refresh no longer signs the committee member out.
+const SESSION_KEY = "adsum.collab.session";
+function loadSession(): Session | null {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    return null;
+  }
+}
+function saveSession(s: Session | null): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+    else localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* private mode: keep the session in memory only. */
+  }
+}
+
 export function App(): JSX.Element {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(() => loadSession());
   const [boardId, setBoardId] = useState<string | null>(null);
 
-  const onAuth = useCallback((s: Session) => setSession(s), []);
+  const onAuth = useCallback((s: Session) => {
+    saveSession(s);
+    setSession(s);
+  }, []);
+  const quitter = useCallback(() => {
+    saveSession(null);
+    setSession(null);
+  }, []);
 
   if (!session) {
     return <Login onAuth={onAuth} />;
@@ -34,14 +61,14 @@ export function App(): JSX.Element {
             Tous les tableaux
           </button>
         )}
-        <span className="event-chip" title="Acces restreint">
+        <span className="event-chip" title="Accès restreint">
           <span className="event-dot" aria-hidden="true" />
-          Comite, acces restreint
+          Comité, accès restreint
         </span>
         <span className="topbar-avatar" title={session.role}>
           {initials}
         </span>
-        <button type="button" className="link" onClick={() => setSession(null)}>
+        <button type="button" className="link" onClick={quitter}>
           Quitter
         </button>
       </header>
