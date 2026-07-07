@@ -22,12 +22,12 @@ export function Login({ onAuth }: LoginProps): JSX.Element {
     try {
       const session = await login(email, password);
       if (!ALLOWED.has(session.role)) {
-        setError("Espace reserve aux membres du comite.");
+        setError("Espace réservé aux membres du comité.");
         return;
       }
       onAuth(session);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Erreur reseau");
+      setError(err instanceof ApiError ? err.message : "Erreur réseau");
     } finally {
       setBusy(false);
     }
@@ -62,7 +62,7 @@ export function Login({ onAuth }: LoginProps): JSX.Element {
         <button type="submit" className="btn btn-primary" disabled={busy}>
           {busy ? "Connexion..." : "Se connecter"}
         </button>
-        <p className="muted small center">Acces restreint, nominatif et supervise.</p>
+        <p className="muted small center">Accès restreint, nominatif et supervisé.</p>
       </form>
     </div>
   );
