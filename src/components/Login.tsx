@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { ApiError, type Session, login } from "../api.js";
+import { PasswordInput } from "./PasswordInput.js";
 
 interface LoginProps {
   onAuth: (session: Session) => void;
@@ -50,8 +51,7 @@ export function Login({ onAuth }: LoginProps): JSX.Element {
         </label>
         <label>
           <span>Mot de passe</span>
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
