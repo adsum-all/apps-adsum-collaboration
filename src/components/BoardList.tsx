@@ -11,20 +11,23 @@ interface BoardListProps {
 export function BoardList({ token, onOpen }: BoardListProps): JSX.Element {
   const { data, loading, error, reload } = useResource(() => getTableaux(token), [token]);
   const [nom, setNom] = useState("");
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   async function create(): Promise<void> {
-    if (!nom.trim()) return;
+    // Guard against a double submit (double click / Enter twice).
+    if (!nom.trim() || busy) return;
     setBusy(true);
     setFormError(null);
     try {
-      const board = await createTableau(token, nom.trim());
+      const board = await createTableau(token, nom.trim(), description.trim() || undefined);
       setNom("");
+      setDescription("");
       reload();
       onOpen(board.id);
     } catch {
-      setFormError("Creation impossible.");
+      setFormError("Création impossible.");
     } finally {
       setBusy(false);
     }
@@ -36,8 +39,8 @@ export function BoardList({ token, onOpen }: BoardListProps): JSX.Element {
     <div className="page">
       <header className="page-head">
         <div>
-          <h1>Tableaux de preparation</h1>
-          <p className="muted">Calendrier partage du comite. Une activite preparee se publie en evenement.</p>
+          <h1>Tableaux de préparation</h1>
+          <p className="muted">Calendrier partagé du comité. Une activité préparée se publie en événement.</p>
         </div>
       </header>
 
@@ -46,15 +49,23 @@ export function BoardList({ token, onOpen }: BoardListProps): JSX.Element {
         <div className="toolbar">
           <input
             className="search"
-            placeholder="Nom du tableau (ex. Retraite de careme 2026)"
+            placeholder="Nom du tableau (ex. Retraite de carême 2026)"
             value={nom}
             onChange={(e) => setNom(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void create()}
           />
           <button type="button" className="btn btn-primary btn-inline" disabled={busy || !nom.trim()} onClick={() => void create()}>
-            {busy ? "Creation..." : "Creer"}
+            {busy ? "Création..." : "Créer"}
           </button>
         </div>
+        <input
+          className="search"
+          style={{ marginTop: 8, width: "100%" }}
+          placeholder="Description (facultative)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && void create()}
+        />
         {formError && <p className="banner banner-error">{formError}</p>}
       </section>
 
@@ -62,7 +73,7 @@ export function BoardList({ token, onOpen }: BoardListProps): JSX.Element {
       {loading && <p className="muted">Chargement...</p>}
 
       {!loading && boards.length === 0 && !error && (
-        <p className="muted">Aucun tableau pour le moment. Creez le premier ci-dessus.</p>
+        <p className="muted">Aucun tableau pour le moment. Créez le premier ci-dessus.</p>
       )}
 
       <div className="board-grid">
