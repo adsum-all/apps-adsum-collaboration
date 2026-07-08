@@ -45,6 +45,27 @@ export function moveCarte(carteId: string, toColonneId: string, toIndex: number)
 export function duplicateCarte(carteId: string): Promise<CarteProto> {
   return request(`${B}/cartes-espace/${carteId}/dupliquer`, { method: "POST" }, "Duplication impossible");
 }
+
+/** Options for publishing a card as a real activity (evenement). The audience is
+ * chosen explicitly; the date falls back to the card's due date server-side. */
+export interface PublicationActivite {
+  cible_type: "general" | "coordination" | "commission" | "intendance" | "tribu";
+  cible_id?: string | null;
+  debut?: string | null;
+  lieu?: string | null;
+  type?: string | null;
+  visibilite?: "public" | "membres" | "prive";
+}
+
+/** Publish a card as a real activity fed to the member agenda through the shared
+ * back-office activity engine. Space members are notified server-side. */
+export function publierCarteEnActivite(carteId: string, options: PublicationActivite): Promise<CarteProto> {
+  return request(
+    `${B}/cartes-espace/${carteId}/publier`,
+    { method: "POST", body: jbody(options) },
+    "Publication impossible",
+  );
+}
 export function deplacerCarteVersTableau(carteId: string, tableauCibleId: string): Promise<CarteProto> {
   return request(
     `${B}/cartes-espace/${carteId}/deplacer-tableau`,

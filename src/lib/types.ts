@@ -144,6 +144,8 @@ export interface CarteProto {
   archive: boolean;
   modele: boolean;
   couverture_id: string | null;
+  publie?: boolean;
+  evenement_id?: string | null;
 }
 
 export interface Notification {
