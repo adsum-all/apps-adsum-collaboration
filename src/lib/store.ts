@@ -17,13 +17,20 @@ import { cachedMe, jbody, request, resetToken, resolveMe, setMe, setToken } from
 
 const B = "/api/v1/collaboration";
 
-// Session lifecycle. initStore stays synchronous like the prototype; it caches
-// the token immediately and resolves the member in the background.
-export function initStore(session: Session): void {
+// Session lifecycle. Caches the token immediately and resolves the current
+// member, returning it so the caller can put it in state (call this once from an
+// effect, never on every render).
+export function initStore(session: Session): Promise<Membre | null> {
   setToken(session.token);
-  void resolveMe(session)
-    .then(setMe)
-    .catch(() => setMe(null));
+  return resolveMe(session)
+    .then((m) => {
+      setMe(m);
+      return m;
+    })
+    .catch(() => {
+      setMe(null);
+      return null;
+    });
 }
 
 export function resetStore(): void {
@@ -150,16 +157,6 @@ export function rechercher(q: string): Promise<ResultatRecherche[]> {
   const query = q.trim();
   if (query.length === 0) return Promise.resolve([]);
   return request(`${B}/recherche?q=${encodeURIComponent(query)}`, { method: "GET" }, "Recherche indisponible");
-}
-
-// Synchronous helpers the prototype resolved locally; here the space is provided
-// by the caller (App resolves espaceCourant from the loaded list) and mention
-// suggestions are resolved by the space members view, so these return neutrally.
-export function espaceDuTableau(_tableauId: string): Espace | null {
-  return null;
-}
-export function suggestionsMembres(_tableauId: string, _fragment: string): Membre[] {
-  return [];
 }
 
 export const PRIORITES: Priorite[] = ["urgente", "haute", "normale", "basse"];

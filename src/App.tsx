@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { type Session } from "./api.js";
 import { Board } from "./components/Board.js";
@@ -16,8 +16,8 @@ import { GlobalSearch } from "./components/search/GlobalSearch.js";
 import { Sidebar, type Route } from "./components/shell/Sidebar.js";
 import { Topbar } from "./components/shell/Topbar.js";
 import { TableauPage } from "./components/tableau/TableauPage.js";
-import { currentMembre, initStore, listEspaces, listNotifications, resetStore } from "./lib/store.js";
-import type { Espace } from "./lib/types.js";
+import { initStore, listEspaces, listNotifications, resetStore } from "./lib/store.js";
+import type { Espace, Membre } from "./lib/types.js";
 import { clearSession, loadSession, saveSession } from "./session.js";
 
 export function App(): JSX.Element {
@@ -30,19 +30,30 @@ export function App(): JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
+  const [me, setMe] = useState<Membre | null>(null);
 
   const reloadEspaces = (): void => {
     void listEspaces().then(setEspaces);
     void listNotifications().then((n) => setNbNotifs(n.filter((x) => !x.lue).length));
   };
 
-  if (session) {
-    initStore(session);
-  }
-
+  // Resolve the session once (token + current member), not on every render, then
+  // load the spaces. Avoids re-firing /auth/me on each 5 s tick.
   useEffect(() => {
-    if (!session) return;
-    reloadEspaces();
+    if (!session) {
+      setMe(null);
+      return;
+    }
+    let alive = true;
+    void initStore(session).then((m) => {
+      if (!alive) return;
+      setMe(m);
+      reloadEspaces();
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   useEffect(() => {
@@ -80,15 +91,6 @@ export function App(): JSX.Element {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [session]);
-
-  const me = useMemo(() => {
-    if (!session) return null;
-    try {
-      return currentMembre();
-    } catch {
-      return null;
-    }
-  }, [session, espaces]);
 
   function onAuth(s: Session): void {
     saveSession(s);

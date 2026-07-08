@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 
-import { espaceDuTableau, listEspaces, listMesCartes } from "../../lib/store.js";
+import { listEspaces, listMesCartes } from "../../lib/store.js";
 import type { CarteProto, Espace } from "../../lib/types.js";
 import { EmptyState } from "../common/EmptyState.js";
+
+// The my-cards API returns each card with the id of the space it belongs to, so
+// the badge and the "open space" action resolve the space from the loaded list.
+type CarteAvecEspace = CarteProto & { espace_id?: string | null };
 
 interface Props {
   moiId: string;
@@ -10,13 +14,13 @@ interface Props {
 }
 
 export function MesCartes({ moiId, onOuvrirEspace }: Props): JSX.Element {
-  const [cartes, setCartes] = useState<CarteProto[]>([]);
-  const [, setEspaces] = useState<Espace[]>([]);
+  const [cartes, setCartes] = useState<CarteAvecEspace[]>([]);
+  const [espaces, setEspaces] = useState<Espace[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void Promise.all([listMesCartes(), listEspaces()]).then(([c, e]) => {
-      setCartes(c);
+      setCartes(c as CarteAvecEspace[]);
       setEspaces(e);
       setLoading(false);
     });
@@ -24,6 +28,8 @@ export function MesCartes({ moiId, onOuvrirEspace }: Props): JSX.Element {
 
   if (loading) return <div className="page"><p className="muted">Chargement...</p></div>;
 
+  const espaceDe = (c: CarteAvecEspace): Espace | undefined =>
+    c.espace_id ? espaces.find((e) => e.id === c.espace_id) : undefined;
   const assignes = cartes.filter((c) => c.assignes.includes(moiId));
   const suivis = cartes.filter((c) => !c.assignes.includes(moiId) && c.suiveurs.includes(moiId));
 
@@ -36,8 +42,8 @@ export function MesCartes({ moiId, onOuvrirEspace }: Props): JSX.Element {
         </div>
       </header>
 
-      <Section titre={`Assignées à moi (${assignes.length})`} cartes={assignes} onOuvrir={onOuvrirEspace} />
-      <Section titre={`Que je suis (${suivis.length})`} cartes={suivis} onOuvrir={onOuvrirEspace} />
+      <Section titre={`Assignées à moi (${assignes.length})`} cartes={assignes} espaceDe={espaceDe} onOuvrir={onOuvrirEspace} />
+      <Section titre={`Que je suis (${suivis.length})`} cartes={suivis} espaceDe={espaceDe} onOuvrir={onOuvrirEspace} />
 
       {cartes.length === 0 && (
         <EmptyState
@@ -52,10 +58,12 @@ export function MesCartes({ moiId, onOuvrirEspace }: Props): JSX.Element {
 function Section({
   titre,
   cartes,
+  espaceDe,
   onOuvrir,
 }: {
   titre: string;
-  cartes: CarteProto[];
+  cartes: CarteAvecEspace[];
+  espaceDe: (c: CarteAvecEspace) => Espace | undefined;
   onOuvrir: (id: string) => void;
 }): JSX.Element | null {
   if (cartes.length === 0) return null;
@@ -64,7 +72,7 @@ function Section({
       <h2 className="card-title">{titre}</h2>
       <ul className="mini-list">
         {cartes.map((c) => {
-          const esp = espaceDuTableau(c.tableau_id);
+          const esp = espaceDe(c);
           return (
             <li key={c.id}>
               <span>

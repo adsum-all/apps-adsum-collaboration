@@ -8,8 +8,16 @@ interface Props {
   onEnregistre: () => void;
 }
 
+function membreSur(): Membre {
+  try {
+    return currentMembre();
+  } catch {
+    return { id: "", nom: "Membre", courriel: "", initiales: "AD" };
+  }
+}
+
 export function ProfilPage({ onEnregistre }: Props): JSX.Element {
-  const [me, setMe] = useState<Membre>(() => currentMembre());
+  const [me, setMe] = useState<Membre>(membreSur);
   const [nom, setNom] = useState(me.nom);
   const [courriel, setCourriel] = useState(me.courriel);
   const [initiales, setInitiales] = useState(me.initiales);
@@ -18,6 +26,14 @@ export function ProfilPage({ onEnregistre }: Props): JSX.Element {
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
+    // Refresh the member from the server so the form is never based on a stale or
+    // empty cache (the resolved identity comes back on the profile endpoint).
+    void mettreAJourMembreCourant({}).then((m) => {
+      setMe(m);
+      setNom(m.nom);
+      setCourriel(m.courriel);
+      setInitiales(m.initiales);
+    });
     void listEspaces().then(setEspaces);
     void listMesCartes().then((c) => setNbCartes(c.length));
   }, []);

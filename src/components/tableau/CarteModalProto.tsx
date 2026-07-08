@@ -10,7 +10,6 @@ import {
   listTableauxEspace,
   marquerCommentairesLus,
   reagirCommentaire,
-  suggestionsMembres,
   toggleArchiveCarte,
   toggleChecklistItem,
   updateCarteProto,
@@ -57,10 +56,17 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
     void listTableauxEspace(espace.id).then(setTableauxCible);
   }, [espace.id]);
 
+  // Mention suggestions from the real space members (the members passed in that
+  // belong to this space), filtered by the typed fragment. No stub.
   const suggestions = useMemo(() => {
     if (!mentionOpen) return [];
-    return suggestionsMembres(carte.tableau_id, mentionFrag);
-  }, [mentionOpen, mentionFrag, carte.tableau_id]);
+    const frag = mentionFrag.trim().toLowerCase();
+    const membresEspace = membres.filter((m) => espace.membres.some((em) => em.membre_id === m.id));
+    if (!frag) return membresEspace.slice(0, 6);
+    return membresEspace
+      .filter((m) => m.nom.toLowerCase().includes(frag) || m.courriel.toLowerCase().includes(frag))
+      .slice(0, 6);
+  }, [mentionOpen, mentionFrag, membres, espace.membres]);
 
   async function save(patch: Partial<CarteProto>): Promise<void> {
     await updateCarteProto(carte.id, patch);
