@@ -22,6 +22,7 @@ const B = "/api/v1/collaboration";
 // effect, never on every render).
 export function initStore(session: Session): Promise<Membre | null> {
   setToken(session.token);
+  void chargerPermissions();
   return resolveMe(session)
     .then((m) => {
       setMe(m);
@@ -166,6 +167,53 @@ export interface ActiviteInput {
 
 export function creerActivite(input: ActiviteInput): Promise<{ id: string }> {
   return request(`${B}/activites`, { method: "POST", body: jbody(input) }, "Activité non créée");
+}
+
+export interface ActiviteDetailData {
+  id: string;
+  titre: string;
+  type: string | null;
+  debut: string | null;
+  fin: string | null;
+  lieu: string | null;
+  cible_type: string | null;
+  visibilite: string | null;
+  annule: boolean;
+}
+
+/** One activity's editable fields (from the shared evenement table), whatever app
+ * created it. Editing/cancelling is allowed from collaboration with the same rights
+ * as the back office (parity). */
+export function detailActivite(id: string): Promise<ActiviteDetailData> {
+  return request(`${B}/activites/${id}`, { method: "GET" }, "Activité indisponible");
+}
+export function modifierActivite(
+  id: string,
+  patch: { titre?: string; type?: string; debut?: string; lieu?: string | null },
+): Promise<{ id: string }> {
+  return request(`${B}/activites/${id}`, { method: "PATCH", body: jbody(patch) }, "Activité non modifiée");
+}
+export function annulerActivite(id: string): Promise<{ id: string }> {
+  return request(`${B}/activites/${id}/annuler`, { method: "POST" }, "Annulation impossible");
+}
+
+// The signed-in account's platform permissions, cached, so the UI knows whether it
+// may create/edit activities (collaboration.gerer) rather than guessing from a role.
+let _permissions: string[] | null = null;
+export async function chargerPermissions(): Promise<void> {
+  try {
+    const d = await request<{ permissions?: string[] }>(
+      "/api/v1/membres/me/permissions",
+      { method: "GET" },
+      "Permissions indisponibles",
+    );
+    _permissions = d.permissions ?? [];
+  } catch {
+    _permissions = [];
+  }
+}
+export function peutGererActivites(): boolean {
+  return (_permissions ?? []).includes("collaboration.gerer");
 }
 
 // Stats
