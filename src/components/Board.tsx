@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { type Carte, type Colonne, createCarte, getTableau, updateCarte } from "../api.js";
 import { useResource } from "../useResource.js";
@@ -12,6 +12,21 @@ interface BoardProps {
 export function Board({ token, boardId }: BoardProps): JSX.Element {
   const { data, loading, error, reload } = useResource(() => getTableau(token, boardId), [token, boardId]);
   const [openCardId, setOpenCardId] = useState<string | null>(null);
+
+  // Light polling so two committee members on the same board converge: a change
+  // in one browser appears in the other within ~8s. Read via refs so the single
+  // interval never leaks and is paused while a card modal is open (that view
+  // polls on its own and we avoid reloading the grid under it).
+  const reloadRef = useRef(reload);
+  reloadRef.current = reload;
+  const openRef = useRef(openCardId);
+  openRef.current = openCardId;
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!openRef.current) reloadRef.current();
+    }, 8000);
+    return () => window.clearInterval(id);
+  }, []);
 
   if (loading) return <div className="page"><p className="muted">Chargement du tableau...</p></div>;
   if (error) return <div className="page"><p className="banner banner-error">{error}</p></div>;
