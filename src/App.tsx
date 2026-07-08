@@ -1,9 +1,23 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { type Session } from "./api.js";
+import { type Session, setUnauthorizedHandler } from "./api.js";
 import { Board } from "./components/Board.js";
 import { BoardList } from "./components/BoardList.js";
 import { Login } from "./components/Login.js";
+
+/** Avatar initials from the signed-in user's e-mail (not their role), falling
+ * back to the role for a legacy session persisted before the e-mail was kept. */
+function avatarInitials(email: string, role: string): string {
+  const local = (email.split("@")[0] ?? "").trim();
+  if (local) {
+    const parts = local.split(/[.\-_+]/).filter(Boolean);
+    const first = parts[0] ?? local;
+    const second = parts[1];
+    const letters = second ? first.slice(0, 1) + second.slice(0, 1) : first.slice(0, 2);
+    return letters.toUpperCase();
+  }
+  return (role.slice(0, 2) || "?").toUpperCase();
+}
 
 // Persisted session: a refresh no longer signs the committee member out.
 const SESSION_KEY = "adsum.collab.session";
@@ -38,11 +52,17 @@ export function App(): JSX.Element {
     setSession(null);
   }, []);
 
+  // Any 401 from the API purges the session and returns to the login screen.
+  useEffect(() => {
+    setUnauthorizedHandler(quitter);
+    return () => setUnauthorizedHandler(null);
+  }, [quitter]);
+
   if (!session) {
     return <Login onAuth={onAuth} />;
   }
 
-  const initials = session.role.slice(0, 2).toUpperCase();
+  const initials = avatarInitials(session.email ?? "", session.role);
 
   return (
     <div className="main">
@@ -65,7 +85,7 @@ export function App(): JSX.Element {
           <span className="event-dot" aria-hidden="true" />
           Comité, accès restreint
         </span>
-        <span className="topbar-avatar" title={session.role}>
+        <span className="topbar-avatar" title={session.email || session.role}>
           {initials}
         </span>
         <button type="button" className="link" onClick={quitter}>

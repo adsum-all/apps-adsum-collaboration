@@ -7,6 +7,15 @@ export type Role = "super_admin" | "admin" | "gestionnaire" | "direction" | stri
 export interface Session {
   token: string;
   role: Role;
+  email: string;
+}
+
+// Registered by the app: called when any request returns 401, so the stale
+// session is purged and the user is sent back to the login screen instead of
+// staying on a dead, signed-out view.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
 }
 
 export interface Tableau {
@@ -71,8 +80,9 @@ async function req<T>(path: string, token: string, init: RequestInit, onError: s
     },
   });
   if (!res.ok) {
+    if (res.status === 401 && onUnauthorized) onUnauthorized();
     const message =
-      res.status === 401 ? "Session expiree" : res.status === 403 ? "Acces refuse" : onError;
+      res.status === 401 ? "Session expirée" : res.status === 403 ? "Accès refusé" : onError;
     throw new ApiError(message, res.status);
   }
   if (res.status === 204) return undefined as T;
@@ -89,7 +99,7 @@ export async function login(email: string, password: string): Promise<Session> {
     throw new ApiError(res.status === 401 ? "Identifiants invalides" : "Service indisponible", res.status);
   }
   const data = (await res.json()) as { access_token: string; role?: Role };
-  return { token: data.access_token, role: data.role ?? "" };
+  return { token: data.access_token, role: data.role ?? "", email };
 }
 
 export function getTableaux(token: string): Promise<Tableau[]> {
