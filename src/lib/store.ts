@@ -136,6 +136,22 @@ export function listCartesAvecEcheance(): Promise<Array<CarteProto & { espace_id
   return request(`${B}/cartes-echeance`, { method: "GET" }, "Echeances indisponibles");
 }
 
+// Real activities published from the visible spaces (same rows as the member
+// agenda and the back office), so the collaboration calendar stays aligned.
+export interface ActivitePubliee {
+  id: string;
+  carte_id: string;
+  tableau_id: string;
+  espace_id: string | null;
+  titre: string;
+  type: string | null;
+  debut: string | null;
+  lieu: string | null;
+}
+export function listActivitesPubliees(): Promise<ActivitePubliee[]> {
+  return request(`${B}/activites`, { method: "GET" }, "Activités indisponibles");
+}
+
 // Stats
 export interface StatsGlobales {
   espaces: number;
