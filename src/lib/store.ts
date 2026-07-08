@@ -140,16 +140,32 @@ export function listCartesAvecEcheance(): Promise<Array<CarteProto & { espace_id
 // agenda and the back office), so the collaboration calendar stays aligned.
 export interface ActivitePubliee {
   id: string;
-  carte_id: string;
-  tableau_id: string;
+  carte_id: string | null;
+  tableau_id: string | null;
   espace_id: string | null;
   titre: string;
   type: string | null;
+  cible_type: string | null;
   debut: string | null;
   lieu: string | null;
 }
 export function listActivitesPubliees(): Promise<ActivitePubliee[]> {
   return request(`${B}/activites`, { method: "GET" }, "Activités indisponibles");
+}
+
+/** Fields to program a real activity from the collaboration app. It lands in the
+ * same evenement table as the back office, so it appears in every calendar. */
+export interface ActiviteInput {
+  titre: string;
+  type: "rassemblement" | "formation" | "priere";
+  debut: string;
+  lieu?: string | null;
+  cible_type?: "general";
+  visibilite?: "public" | "membres" | "prive";
+}
+
+export function creerActivite(input: ActiviteInput): Promise<{ id: string }> {
+  return request(`${B}/activites`, { method: "POST", body: jbody(input) }, "Activité non créée");
 }
 
 // Stats

@@ -24,9 +24,26 @@ export function TabReglages({ espace, roleReel, viewAs, onViewAs, onChanged }: P
   const [description, setDescription] = useState(espace.description);
   const [newEt, setNewEt] = useState("");
   const [newEtCouleur, setNewEtCouleur] = useState("#2a4fad");
+  const [enregistrement, setEnregistrement] = useState<"" | "cours" | "ok" | "erreur">("");
+  const [erreurMsg, setErreurMsg] = useState<string | null>(null);
   const roleEffectif: RoleEspace | null = viewAs ?? roleReel;
   const peutGererEt = peut(espace, roleEffectif, "gerer_etiquettes");
+  const peutModifier = peut(espace, roleEffectif, "gerer_membres");
   const estProprio = roleReel === "proprietaire";
+
+  async function enregistrerGeneral(): Promise<void> {
+    setEnregistrement("cours");
+    setErreurMsg(null);
+    try {
+      await updateEspace(espace.id, { nom: nom.trim(), description });
+      await onChanged();
+      setEnregistrement("ok");
+      window.setTimeout(() => setEnregistrement(""), 2500);
+    } catch (err) {
+      setEnregistrement("erreur");
+      setErreurMsg(err instanceof Error ? err.message : "Enregistrement impossible");
+    }
+  }
 
   return (
     <div>
@@ -35,22 +52,25 @@ export function TabReglages({ espace, roleReel, viewAs, onViewAs, onChanged }: P
         <div className="form-grid">
           <label>
             <span>Nom de l'espace</span>
-            <input value={nom} onChange={(e) => setNom(e.target.value)} disabled={!peut(espace, roleEffectif, "gerer_membres")} />
+            <input value={nom} onChange={(e) => setNom(e.target.value)} disabled={!peutModifier} />
           </label>
           <label>
             <span>Description</span>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!peut(espace, roleEffectif, "gerer_membres")} />
+            <input value={description} onChange={(e) => setDescription(e.target.value)} disabled={!peutModifier} />
           </label>
         </div>
-        <div className="modal-actions">
+        <div className="modal-actions" style={{ alignItems: "center", gap: 12 }}>
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!peut(espace, roleEffectif, "gerer_membres")}
-            onClick={() => void updateEspace(espace.id, { nom, description }).then(onChanged)}
+            disabled={!peutModifier || enregistrement === "cours" || !nom.trim()}
+            onClick={() => void enregistrerGeneral()}
           >
-            Enregistrer
+            {enregistrement === "cours" ? "Enregistrement..." : "Enregistrer"}
           </button>
+          {enregistrement === "ok" && <span className="small" style={{ color: "var(--ok, #1a7f37)" }}>Enregistré.</span>}
+          {enregistrement === "erreur" && <span className="small" style={{ color: "var(--danger, #c0392b)" }}>{erreurMsg}</span>}
+          {!peutModifier && <span className="muted small">Réservé au propriétaire ou à un administrateur de l'espace.</span>}
         </div>
       </section>
 

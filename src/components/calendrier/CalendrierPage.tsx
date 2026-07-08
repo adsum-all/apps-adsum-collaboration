@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { type ActivitePubliee, listActivitesPubliees, listCartesAvecEcheance, listEspaces } from "../../lib/store.js";
+import { type ActivitePubliee, creerActivite, listActivitesPubliees, listCartesAvecEcheance, listEspaces } from "../../lib/store.js";
 import type { CarteProto, Espace, Priorite } from "../../lib/types.js";
 import { EmptyState } from "../common/EmptyState.js";
 
@@ -25,12 +25,51 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
   const [filtreEspace, setFiltreEspace] = useState<string>(scopeEspaceId ?? "tous");
   const [filtreEtiquette, setFiltreEtiquette] = useState<string>("toutes");
   const [filtrePriorite, setFiltrePriorite] = useState<Priorite | "toutes">("toutes");
+  const [showForm, setShowForm] = useState(false);
+  const [fTitre, setFTitre] = useState("");
+  const [fType, setFType] = useState<"rassemblement" | "formation" | "priere">("rassemblement");
+  const [fDate, setFDate] = useState("");
+  const [fLieu, setFLieu] = useState("");
+  const [fErr, setFErr] = useState<string | null>(null);
+  const [fBusy, setFBusy] = useState(false);
+
+  const rechargerActivites = (): void => {
+    void listActivitesPubliees().then(setActivites);
+  };
 
   useEffect(() => {
     void listCartesAvecEcheance().then(setCartes);
     void listActivitesPubliees().then(setActivites);
     void listEspaces().then(setEspaces);
   }, []);
+
+  async function soumettreActivite(): Promise<void> {
+    setFErr(null);
+    if (!fTitre.trim() || !fDate) {
+      setFErr("Titre et date requis.");
+      return;
+    }
+    setFBusy(true);
+    try {
+      await creerActivite({
+        titre: fTitre.trim(),
+        type: fType,
+        debut: new Date(fDate).toISOString(),
+        lieu: fLieu.trim() || null,
+        cible_type: "general",
+        visibilite: "membres",
+      });
+      setShowForm(false);
+      setFTitre("");
+      setFLieu("");
+      setFDate("");
+      rechargerActivites();
+    } catch (err) {
+      setFErr(err instanceof Error ? err.message : "Activité non créée");
+    } finally {
+      setFBusy(false);
+    }
+  }
 
   const etiquettes = useMemo(() => {
     const src = filtreEspace !== "tous" ? espaces.filter((e) => e.id === filtreEspace) : espaces;
@@ -84,7 +123,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
     <div className="page page-wide">
       <header className="page-head">
         <h1>Calendrier des activités</h1>
-        <p className="muted">Les échéances de vos cartes et les activités publiées, comme dans l'agenda des membres.</p>
+        <p className="muted">Toutes les activités programmées (même source que le back office et l'agenda des membres), plus les échéances de vos cartes.</p>
       </header>
 
       <div className="cal-toolbar">
@@ -93,6 +132,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
           <strong>{MOIS[mois]} {annee}</strong>
           <button type="button" className="btn btn-ghost btn-inline" onClick={() => nav(1)} aria-label="Mois suivant">›</button>
           <button type="button" className="btn btn-ghost btn-inline" onClick={() => { setAnnee(today.getFullYear()); setMois(today.getMonth()); }}>Aujourd'hui</button>
+          <button type="button" className="btn btn-primary btn-inline" onClick={() => { setShowForm((v) => !v); setFErr(null); }}>+ Nouvelle activité</button>
         </div>
         <div className="cal-filtres">
           {!scopeEspaceId && (
@@ -124,6 +164,38 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
         </div>
       </div>
 
+      {showForm && (
+        <div className="carte-form" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end", padding: 12, border: "1px solid var(--border, #e2e2e2)", borderRadius: 10, marginBottom: 12 }}>
+          <label>
+            <span className="muted small">Titre</span>
+            <input type="text" value={fTitre} onChange={(e) => setFTitre(e.target.value)} placeholder="Nom de l'activité" />
+          </label>
+          <label>
+            <span className="muted small">Type</span>
+            <select value={fType} onChange={(e) => setFType(e.target.value as typeof fType)}>
+              <option value="rassemblement">Rassemblement</option>
+              <option value="formation">Formation</option>
+              <option value="priere">Prière</option>
+            </select>
+          </label>
+          <label>
+            <span className="muted small">Date</span>
+            <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} />
+          </label>
+          <label>
+            <span className="muted small">Lieu</span>
+            <input type="text" value={fLieu} onChange={(e) => setFLieu(e.target.value)} placeholder="Optionnel" />
+          </label>
+          <button type="button" className="btn btn-primary btn-inline" disabled={fBusy} onClick={() => void soumettreActivite()}>
+            {fBusy ? "Création..." : "Créer l'activité"}
+          </button>
+          <span className="muted small" style={{ width: "100%" }}>
+            L'activité est programmée pour tous les membres et apparaît dans tous les calendriers (back office, membres).
+          </span>
+          {fErr && <span className="small" style={{ color: "var(--danger, #c0392b)", width: "100%" }}>{fErr}</span>}
+        </div>
+      )}
+
       {cartesFiltrees.length === 0 && activitesFiltrees.length === 0 && (
         <EmptyState titre="Aucune activité programmée" description="Ajoutez une échéance à vos cartes, ou publiez une carte en activité, pour les voir apparaître ici." />
       )}
@@ -142,14 +214,19 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
                   if (item.kind === "activite") {
                     const a = item.act;
                     const esp = espaceOf(a.espace_id);
+                    const depuisCarte = Boolean(a.espace_id && a.tableau_id && a.carte_id);
                     return (
                       <button
                         key={`a-${a.id}`}
                         type="button"
                         className="cal-event cal-event-activite"
-                        style={{ background: esp?.couleur ?? "#4b5563", color: "#fff" }}
-                        onClick={() => onOuvrirCarte && a.espace_id && onOuvrirCarte(a.espace_id, a.tableau_id, a.carte_id)}
-                        title={`Activité publiée${esp ? " · " + esp.nom : ""} · ${a.titre}`}
+                        style={{ background: esp?.couleur ?? "#4b5563", color: "#fff", cursor: depuisCarte ? "pointer" : "default" }}
+                        onClick={() => {
+                          if (onOuvrirCarte && a.espace_id && a.tableau_id && a.carte_id) {
+                            onOuvrirCarte(a.espace_id, a.tableau_id, a.carte_id);
+                          }
+                        }}
+                        title={`Activité${esp ? " · " + esp.nom : ""} · ${a.titre}`}
                       >
                         <span className="cal-event-titre">◆ {a.titre}</span>
                       </button>
