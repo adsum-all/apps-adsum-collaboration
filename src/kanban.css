@@ -307,3 +307,35 @@
     border-top: 1px solid var(--adsum-line);
   }
 }
+
+/* Mobile kanban: one column at a time with scroll-snap, the next one peeked, and
+   a sticky column header, so it is thumb-friendly on a phone instead of a raw
+   horizontal scroll. Design stays light (tokens only). */
+@media (max-width: 820px) {
+  .kanban {
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: 12px;
+    -webkit-overflow-scrolling: touch;
+    gap: 12px;
+  }
+  .kanban-col {
+    flex: 0 0 86vw;
+    max-width: 86vw;
+    scroll-snap-align: start;
+    max-height: calc(100dvh - 170px);
+  }
+  .kanban-col-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--adsum-board);
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+}
+@media (max-width: 480px) {
+  .kanban-col {
+    flex-basis: 90vw;
+    max-width: 90vw;
+  }
+}
