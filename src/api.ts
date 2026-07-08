@@ -178,6 +178,52 @@ export function publierCarte(token: string, carteId: string): Promise<Carte> {
   );
 }
 
+export interface EspaceResume {
+  id: string;
+  nom: string;
+  description: string | null;
+  type: string;
+  couleur: string;
+  initiale: string;
+  nb_membres: number;
+}
+
+/** The spaces the signed-in committee member belongs to. Returns [] gracefully
+ * while the space backend is not yet deployed (the shell then shows "Aucun
+ * espace" instead of failing). */
+export async function getEspaces(token: string): Promise<EspaceResume[]> {
+  try {
+    return await req<EspaceResume[]>("/api/v1/collaboration/espaces", token, { method: "GET" }, "Espaces indisponibles");
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return [];
+    throw e;
+  }
+}
+
+export interface CarteCalendrier {
+  id: string;
+  titre: string;
+  date_prevue: string;
+  lieu: string | null;
+  type_activite: string | null;
+  tableau_id: string;
+  tableau_nom: string;
+  publie: boolean;
+  evenement_id: string | null;
+}
+
+/** Planned activities (cards carrying a date) across the committee boards, in the
+ * [debut, fin] window. Powers the collaboration calendar. */
+export function getCalendrier(token: string, debut: string, fin: string): Promise<CarteCalendrier[]> {
+  const qs = new URLSearchParams({ debut, fin }).toString();
+  return req<CarteCalendrier[]>(
+    `/api/v1/collaboration/calendrier?${qs}`,
+    token,
+    { method: "GET" },
+    "Calendrier indisponible",
+  );
+}
+
 export function apiBaseUrl(): string {
   return BASE;
 }
