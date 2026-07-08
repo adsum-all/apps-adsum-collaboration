@@ -178,6 +178,28 @@ export function publierCarte(token: string, carteId: string): Promise<Carte> {
   );
 }
 
+export interface EspaceResume {
+  id: string;
+  nom: string;
+  description: string | null;
+  type: string;
+  couleur: string;
+  initiale: string;
+  nb_membres: number;
+}
+
+/** The spaces the signed-in committee member belongs to. Returns [] gracefully
+ * while the space backend is not yet deployed (the shell then shows "Aucun
+ * espace" instead of failing). */
+export async function getEspaces(token: string): Promise<EspaceResume[]> {
+  try {
+    return await req<EspaceResume[]>("/api/v1/collaboration/espaces", token, { method: "GET" }, "Espaces indisponibles");
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) return [];
+    throw e;
+  }
+}
+
 export interface CarteCalendrier {
   id: string;
   titre: string;

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 import "@adsum/tokens/tokens.css";
 import "./styles.css";
+import "./shell.css";
 import "./kanban.css";
 
 const root = document.getElementById("root");
