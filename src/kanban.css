@@ -302,6 +302,10 @@
     grid-template-columns: 1fr;
     overflow-y: auto;
   }
+  /* Stack the detail fields so the card modal never scrolls horizontally. */
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
   .modal-chat {
     border-left: none;
     border-top: 1px solid var(--adsum-line);

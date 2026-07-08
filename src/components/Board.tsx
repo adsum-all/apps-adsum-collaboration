@@ -50,7 +50,7 @@ export function Board({ token, boardId }: BoardProps): JSX.Element {
       <header className="page-head">
         <div>
           <h1>{data.nom}</h1>
-          <p className="muted">{data.description ?? "Preparez, discutez, puis publiez l'activite en evenement."}</p>
+          <p className="muted">{data.description ?? "Préparez, discutez, puis publiez l'activité en événement."}</p>
         </div>
       </header>
 

@@ -87,7 +87,7 @@ export function CardModal({ token, carte, onClose, onChanged }: CardModalProps):
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
-          <h2>Fiche de preparation</h2>
+          <h2>Fiche de préparation</h2>
           <button type="button" className="link" onClick={onClose}>
             Fermer
           </button>
@@ -105,15 +105,15 @@ export function CardModal({ token, carte, onClose, onChanged }: CardModalProps):
             </label>
             <div className="modal-grid">
               <label>
-                <span>Type d'activite</span>
-                <input value={typeActivite} onChange={(e) => setTypeActivite(e.target.value)} placeholder="Formation, veillee..." />
+                <span>Type d'activité</span>
+                <input value={typeActivite} onChange={(e) => setTypeActivite(e.target.value)} placeholder="Formation, veillée..." />
               </label>
               <label>
                 <span>Lieu</span>
                 <input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Salle, chapelle..." />
               </label>
               <label>
-                <span>Date prevue</span>
+                <span>Date prévue</span>
                 <input type="datetime-local" value={datePrevue} onChange={(e) => setDatePrevue(e.target.value)} />
               </label>
             </div>
@@ -122,17 +122,17 @@ export function CardModal({ token, carte, onClose, onChanged }: CardModalProps):
                 {saving ? "Enregistrement..." : "Enregistrer"}
               </button>
               {publie ? (
-                <span className="badge badge-ok">Publie en evenement</span>
+                <span className="badge badge-ok">Publié en événement</span>
               ) : (
                 <button type="button" className="btn btn-primary btn-inline" onClick={() => void publish()}>
-                  Publier en evenement
+                  Publier en événement
                 </button>
               )}
             </div>
-            {savedAt && <p className="muted small">Enregistre a {savedAt}. Une nouvelle version est conservee.</p>}
+            {savedAt && <p className="muted small">Enregistré à {savedAt}. Une nouvelle version est conservée.</p>}
             {publishError && <p className="banner banner-error">{publishError}</p>}
             {publie && (
-              <p className="muted small">L'evenement est cree et sa session de pointage est ouverte.</p>
+              <p className="muted small">L'événement est créé et sa session de pointage est ouverte.</p>
             )}
           </div>
 
@@ -142,7 +142,7 @@ export function CardModal({ token, carte, onClose, onChanged }: CardModalProps):
               {comments.length === 0 && <p className="muted small">Aucun message. Lancez la discussion.</p>}
               {comments.map((c) => (
                 <div key={c.id} className="chat-msg">
-                  <span className="chat-author">{c.auteur_nom ?? "Comite"}</span>
+                  <span className="chat-author">{c.auteur_nom ?? "Comité"}</span>
                   <span className="chat-body">{c.corps}</span>
                   {c.cree_le && <span className="chat-time">{new Date(c.cree_le).toLocaleTimeString("fr-FR")}</span>}
                 </div>
