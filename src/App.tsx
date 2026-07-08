@@ -3,7 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import { type Session, setUnauthorizedHandler } from "./api.js";
 import { Board } from "./components/Board.js";
 import { BoardList } from "./components/BoardList.js";
+import { Calendar } from "./components/Calendar.js";
 import { Login } from "./components/Login.js";
+
+type Vue = "tableaux" | "calendrier";
 
 /** Avatar initials from the signed-in user's e-mail (not their role), falling
  * back to the role for a legacy session persisted before the e-mail was kept. */
@@ -42,6 +45,12 @@ function saveSession(s: Session | null): void {
 export function App(): JSX.Element {
   const [session, setSession] = useState<Session | null>(() => loadSession());
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [vue, setVue] = useState<Vue>("tableaux");
+
+  const ouvrirTableau = useCallback((id: string) => {
+    setBoardId(id);
+    setVue("tableaux");
+  }, []);
 
   const onAuth = useCallback((s: Session) => {
     saveSession(s);
@@ -76,7 +85,26 @@ export function App(): JSX.Element {
             <span className="brand-sub">Collaboration</span>
           </span>
         </div>
-        {boardId && (
+        <nav className="topbar-nav" aria-label="Navigation">
+          <button
+            type="button"
+            className={`topbar-tab${vue === "tableaux" ? " is-active" : ""}`}
+            onClick={() => {
+              setVue("tableaux");
+              setBoardId(null);
+            }}
+          >
+            Tableaux
+          </button>
+          <button
+            type="button"
+            className={`topbar-tab${vue === "calendrier" ? " is-active" : ""}`}
+            onClick={() => setVue("calendrier")}
+          >
+            Calendrier
+          </button>
+        </nav>
+        {vue === "tableaux" && boardId && (
           <button type="button" className="link" onClick={() => setBoardId(null)}>
             Tous les tableaux
           </button>
@@ -93,10 +121,12 @@ export function App(): JSX.Element {
         </button>
       </header>
       <div className="main-scroll">
-        {boardId ? (
+        {vue === "calendrier" ? (
+          <Calendar token={session.token} onOpenBoard={ouvrirTableau} />
+        ) : boardId ? (
           <Board token={session.token} boardId={boardId} />
         ) : (
-          <BoardList token={session.token} onOpen={setBoardId} />
+          <BoardList token={session.token} onOpen={ouvrirTableau} />
         )}
       </div>
     </div>

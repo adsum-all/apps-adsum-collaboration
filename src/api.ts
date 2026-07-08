@@ -178,6 +178,30 @@ export function publierCarte(token: string, carteId: string): Promise<Carte> {
   );
 }
 
+export interface CarteCalendrier {
+  id: string;
+  titre: string;
+  date_prevue: string;
+  lieu: string | null;
+  type_activite: string | null;
+  tableau_id: string;
+  tableau_nom: string;
+  publie: boolean;
+  evenement_id: string | null;
+}
+
+/** Planned activities (cards carrying a date) across the committee boards, in the
+ * [debut, fin] window. Powers the collaboration calendar. */
+export function getCalendrier(token: string, debut: string, fin: string): Promise<CarteCalendrier[]> {
+  const qs = new URLSearchParams({ debut, fin }).toString();
+  return req<CarteCalendrier[]>(
+    `/api/v1/collaboration/calendrier?${qs}`,
+    token,
+    { method: "GET" },
+    "Calendrier indisponible",
+  );
+}
+
 export function apiBaseUrl(): string {
   return BASE;
 }
