@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { type ActivitePubliee, creerActivite, listActivitesPubliees, listCartesAvecEcheance, listEspaces } from "../../lib/store.js";
+import { type ActivitePubliee, creerActivite, listActivitesPubliees, listCartesAvecEcheance, listEspaces, peutGererActivites } from "../../lib/store.js";
 import type { CarteProto, Espace, Priorite } from "../../lib/types.js";
 import { EmptyState } from "../common/EmptyState.js";
+import { ActiviteModal } from "./ActiviteModal.js";
 
 type CarteCal = CarteProto & { espace_id: string | null };
 type ItemCal = { kind: "carte"; carte: CarteCal } | { kind: "activite"; act: ActivitePubliee };
@@ -32,6 +33,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
   const [fLieu, setFLieu] = useState("");
   const [fErr, setFErr] = useState<string | null>(null);
   const [fBusy, setFBusy] = useState(false);
+  const [activiteOuverte, setActiviteOuverte] = useState<string | null>(null);
 
   const rechargerActivites = (): void => {
     void listActivitesPubliees().then(setActivites);
@@ -87,12 +89,12 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
     });
   }, [cartes, filtreEspace, filtreEtiquette, filtrePriorite]);
 
-  // Published activities respect the space filter only: they are real events, not
-  // bound to a card's label or priority.
-  const activitesFiltrees = useMemo(
-    () => activites.filter((a) => filtreEspace === "tous" || a.espace_id === filtreEspace),
-    [activites, filtreEspace],
-  );
+  // Activities are the whole fraternity's programme (same evenement table as the
+  // back office and the member agenda): they are shown in every collaboration
+  // calendar, general or inside a workspace, without space scoping. Only the card
+  // due dates below are space-specific. This is why the workspace calendar shows
+  // exactly the same activities as the general one.
+  const activitesFiltrees = activites;
 
   const grille = useMemo(() => buildGrille(annee, mois), [annee, mois]);
   const parJour = useMemo(() => {
@@ -132,7 +134,9 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
           <strong>{MOIS[mois]} {annee}</strong>
           <button type="button" className="btn btn-ghost btn-inline" onClick={() => nav(1)} aria-label="Mois suivant">›</button>
           <button type="button" className="btn btn-ghost btn-inline" onClick={() => { setAnnee(today.getFullYear()); setMois(today.getMonth()); }}>Aujourd'hui</button>
-          <button type="button" className="btn btn-primary btn-inline" onClick={() => { setShowForm((v) => !v); setFErr(null); }}>+ Nouvelle activité</button>
+          {peutGererActivites() && (
+            <button type="button" className="btn btn-primary btn-inline" onClick={() => { setShowForm((v) => !v); setFErr(null); }}>+ Nouvelle activité</button>
+          )}
         </div>
         <div className="cal-filtres">
           {!scopeEspaceId && (
@@ -214,19 +218,17 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
                   if (item.kind === "activite") {
                     const a = item.act;
                     const esp = espaceOf(a.espace_id);
-                    const depuisCarte = Boolean(a.espace_id && a.tableau_id && a.carte_id);
+                    // Every activity opens the same editor, whatever app created it
+                    // (parity with the back office). Coloured by its space when it
+                    // came from a card, otherwise the accent colour: never greyed.
                     return (
                       <button
                         key={`a-${a.id}`}
                         type="button"
                         className="cal-event cal-event-activite"
-                        style={{ background: esp?.couleur ?? "#4b5563", color: "#fff", cursor: depuisCarte ? "pointer" : "default" }}
-                        onClick={() => {
-                          if (onOuvrirCarte && a.espace_id && a.tableau_id && a.carte_id) {
-                            onOuvrirCarte(a.espace_id, a.tableau_id, a.carte_id);
-                          }
-                        }}
-                        title={`Activité${esp ? " · " + esp.nom : ""} · ${a.titre}`}
+                        style={{ background: esp?.couleur ?? "#2a4fad", color: "#fff", cursor: "pointer" }}
+                        onClick={() => setActiviteOuverte(a.id)}
+                        title={`Activité${esp ? " · " + esp.nom : ""} · ${a.titre} (cliquer pour éditer)`}
                       >
                         <span className="cal-event-titre">◆ {a.titre}</span>
                       </button>
@@ -253,6 +255,14 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
           );
         })}
       </div>
+
+      {activiteOuverte && (
+        <ActiviteModal
+          activiteId={activiteOuverte}
+          onClose={() => setActiviteOuverte(null)}
+          onChanged={rechargerActivites}
+        />
+      )}
     </div>
   );
 }
