@@ -338,3 +338,16 @@ select {
 .repart-basse { background: #7a8aa5; }
 .repart-val { text-align: right; color: var(--adsum-mut); font-variant-numeric: tabular-nums; }
 .et-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* Read-only profile fields (identity is managed centrally in the back office). */
+.profil-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--adsum-line);
+}
+.profil-champ strong {
+  color: var(--adsum-ink);
+  font-size: var(--adsum-text-md);
+}

@@ -88,6 +88,18 @@ export function refuserDemande(espaceId: string, demandeId: string): Promise<Esp
   return request(`${B}/espaces/${espaceId}/demandes/${demandeId}`, { method: "DELETE" }, "Action impossible");
 }
 
+export interface RejoindreResultat {
+  espace_id: string;
+  espace_nom: string;
+  statut: string;
+}
+
+/** Follow an invitation link: files an access request for the current member
+ * (or reports they are already a member). */
+export function rejoindreEspace(jeton: string): Promise<RejoindreResultat> {
+  return request(`${B}/rejoindre/${encodeURIComponent(jeton)}`, { method: "POST" }, "Invitation invalide");
+}
+
 // Labels
 export function createEtiquette(espaceId: string, input: Omit<Etiquette, "id">): Promise<Etiquette> {
   return request(`${B}/espaces/${espaceId}/etiquettes`, { method: "POST", body: jbody(input) }, "Etiquette non creee");
@@ -99,11 +111,10 @@ export function deleteEtiquette(espaceId: string, id: string): Promise<void> {
   return request(`${B}/espaces/${espaceId}/etiquettes/${id}`, { method: "DELETE" }, "Etiquette non supprimee");
 }
 
-// Current member profile
-export function mettreAJourMembreCourant(
-  patch: Partial<Pick<Membre, "nom" | "courriel" | "initiales">>,
-): Promise<Membre> {
-  return request<Membre>(`${B}/moi`, { method: "PATCH", body: jbody(patch) }, "Profil non mis a jour").then((m) => {
+// Current member profile (read-only: identity is managed centrally in the back
+// office and governed by the civil-identity rules, so collaboration only reads it).
+export function getMoi(): Promise<Membre> {
+  return request<Membre>(`${B}/moi`, { method: "GET" }, "Profil indisponible").then((m) => {
     setMe(m);
     return m;
   });
