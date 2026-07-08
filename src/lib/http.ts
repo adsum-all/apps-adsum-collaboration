@@ -47,17 +47,24 @@ function nameFromEmail(email: string): string {
   return local.replace(/[.\-_+]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Resolve the signed-in committee member from the auth session, so the spaces
- * store can attribute actions and filter "my" items. */
+/** Resolve the signed-in member from the collaboration profile endpoint, so the
+ * shell shows the real display name (nom_affiche), not one fabricated from the
+ * e-mail. Falls back to the auth account if the profile is unavailable. */
 export async function resolveMe(session: Session): Promise<Membre> {
-  const res = await fetch(`${BASE}/api/v1/auth/me`, {
+  const res = await fetch(`${BASE}/api/v1/collaboration/moi`, {
     headers: { Authorization: `Bearer ${session.token}` },
   });
-  if (!res.ok) throw new ApiError("Profil indisponible", res.status);
-  const u = (await res.json()) as { id: string; email: string };
+  if (res.ok) {
+    return (await res.json()) as Membre;
+  }
+  // Fallback: the login account, name derived from the e-mail local part.
+  const auth = await fetch(`${BASE}/api/v1/auth/me`, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  if (!auth.ok) throw new ApiError("Profil indisponible", auth.status);
+  const u = (await auth.json()) as { id: string; email: string };
   const nom = nameFromEmail(u.email);
-  const membre: Membre = { id: u.id, nom, courriel: u.email, initiales: initials(nom) };
-  return membre;
+  return { id: u.id, nom, courriel: u.email, initiales: initials(nom) };
 }
 
 export async function request<T>(

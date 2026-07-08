@@ -16,7 +16,7 @@ import { GlobalSearch } from "./components/search/GlobalSearch.js";
 import { Sidebar, type Route } from "./components/shell/Sidebar.js";
 import { Topbar } from "./components/shell/Topbar.js";
 import { TableauPage } from "./components/tableau/TableauPage.js";
-import { initStore, listEspaces, listNotifications, resetStore } from "./lib/store.js";
+import { initStore, listEspaces, listNotifications, rejoindreEspace, resetStore } from "./lib/store.js";
 import type { Espace, Membre } from "./lib/types.js";
 import { clearSession, loadSession, saveSession } from "./session.js";
 
@@ -31,11 +31,31 @@ export function App(): JSX.Element {
   const [searchQ, setSearchQ] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [me, setMe] = useState<Membre | null>(null);
+  const [rejoindreMsg, setRejoindreMsg] = useState<string | null>(null);
 
   const reloadEspaces = (): void => {
     void listEspaces().then(setEspaces);
     void listNotifications().then((n) => setNbNotifs(n.filter((x) => !x.lue).length));
   };
+
+  // Invitation link: /rejoindre?jeton=... files an access request for the member.
+  useEffect(() => {
+    if (!session) return;
+    if (typeof window === "undefined" || window.location.pathname !== "/rejoindre") return;
+    const jeton = new URLSearchParams(window.location.search).get("jeton");
+    window.history.replaceState({}, "", "/");
+    if (!jeton) return;
+    void rejoindreEspace(jeton)
+      .then((r) => {
+        if (r.statut === "deja_membre") {
+          setRejoindreMsg(`Vous etes deja membre de « ${r.espace_nom} ».`);
+          setRoute({ kind: "espace", id: r.espace_id });
+        } else {
+          setRejoindreMsg(`Demande d'acces envoyee a « ${r.espace_nom} ». Un responsable doit la valider.`);
+        }
+      })
+      .catch(() => setRejoindreMsg("Cette invitation n'est plus valide."));
+  }, [session]);
 
   // Resolve the session once (token + current member), not on every render, then
   // load the spaces. Avoids re-firing /auth/me on each 5 s tick.
@@ -141,6 +161,14 @@ export function App(): JSX.Element {
           onOpenSearch={() => { setSearchQ(""); setSearchOpen(true); }}
         />
         <div className="main-scroll">
+          {rejoindreMsg && (
+            <div className="banner banner-ok" role="status">
+              {rejoindreMsg}
+              <button type="button" className="link" onClick={() => setRejoindreMsg(null)} style={{ marginLeft: 12 }}>
+                Fermer
+              </button>
+            </div>
+          )}
           {route.kind === "accueil" && (
             <Home
               espaces={espaces}
@@ -159,7 +187,7 @@ export function App(): JSX.Element {
             <NotificationsPage onOuvrirEspace={(id) => setRoute({ kind: "espace", id })} />
           )}
           {route.kind === "profil" && (
-            <ProfilPage onEnregistre={reloadEspaces} />
+            <ProfilPage />
           )}
           {route.kind === "espace" && espaceCourant && (
             <EspacePage

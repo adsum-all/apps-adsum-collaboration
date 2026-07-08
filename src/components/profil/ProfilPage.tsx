@@ -1,12 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { currentMembre, listEspaces, listMesCartes, mettreAJourMembreCourant } from "../../lib/store.js";
+import { currentMembre, getMoi, listEspaces, listMesCartes } from "../../lib/store.js";
 import { libelleRole, roleDansEspace } from "../../lib/permissions.js";
 import type { Espace, Membre } from "../../lib/types.js";
-
-interface Props {
-  onEnregistre: () => void;
-}
 
 function membreSur(): Membre {
   try {
@@ -16,36 +12,17 @@ function membreSur(): Membre {
   }
 }
 
-export function ProfilPage({ onEnregistre }: Props): JSX.Element {
+export function ProfilPage(): JSX.Element {
   const [me, setMe] = useState<Membre>(membreSur);
-  const [nom, setNom] = useState(me.nom);
-  const [courriel, setCourriel] = useState(me.courriel);
-  const [initiales, setInitiales] = useState(me.initiales);
   const [espaces, setEspaces] = useState<Espace[]>([]);
   const [nbCartes, setNbCartes] = useState(0);
-  const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    // Refresh the member from the server so the form is never based on a stale or
-    // empty cache (the resolved identity comes back on the profile endpoint).
-    void mettreAJourMembreCourant({}).then((m) => {
-      setMe(m);
-      setNom(m.nom);
-      setCourriel(m.courriel);
-      setInitiales(m.initiales);
-    });
+    // Read the real identity from the server (nom_affiche), never a stale cache.
+    void getMoi().then(setMe);
     void listEspaces().then(setEspaces);
     void listMesCartes().then((c) => setNbCartes(c.length));
   }, []);
-
-  async function save(): Promise<void> {
-    const next = await mettreAJourMembreCourant({ nom, courriel, initiales });
-    setMe(next);
-    setInitiales(next.initiales);
-    setOk(true);
-    onEnregistre();
-    setTimeout(() => setOk(false), 2500);
-  }
 
   return (
     <div className="page">
@@ -55,26 +32,20 @@ export function ProfilPage({ onEnregistre }: Props): JSX.Element {
       </header>
 
       <div className="profil-carte">
-        <div className="profil-avatar" aria-hidden="true">{initiales}</div>
+        <div className="profil-avatar" aria-hidden="true">{me.initiales}</div>
         <div className="profil-form">
-          <label>
-            <span>Nom affiché</span>
-            <input value={nom} onChange={(e) => setNom(e.target.value)} maxLength={80} />
-          </label>
-          <label>
-            <span>Courriel</span>
-            <input type="email" value={courriel} onChange={(e) => setCourriel(e.target.value)} />
-          </label>
-          <label>
-            <span>Initiales</span>
-            <input value={initiales} onChange={(e) => setInitiales(e.target.value.toUpperCase().slice(0, 3))} maxLength={3} />
-          </label>
-          <div className="row-end">
-            {ok && <span className="badge badge-ok">Enregistré</span>}
-            <button type="button" className="btn btn-primary" onClick={save} disabled={!nom.trim()}>
-              Enregistrer
-            </button>
+          <div className="profil-champ">
+            <span className="muted small">Nom affiché</span>
+            <strong>{me.nom}</strong>
           </div>
+          <div className="profil-champ">
+            <span className="muted small">Courriel</span>
+            <strong>{me.courriel}</strong>
+          </div>
+          <p className="muted small">
+            Votre identité est gérée de façon centralisée par l&apos;administration (back-office) et partagée par
+            toutes les applications. Elle ne se modifie pas ici.
+          </p>
         </div>
       </div>
 
