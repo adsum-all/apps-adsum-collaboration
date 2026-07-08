@@ -15,7 +15,15 @@ interface Props { espaceId: string; }
 
 export function DashboardEspace({ espaceId }: Props): JSX.Element {
   const [s, setS] = useState<Stats | null>(null);
-  useEffect(() => { void statsEspace(espaceId).then(setS); }, [espaceId]);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    setS(null);
+    setErr(null);
+    statsEspace(espaceId)
+      .then(setS)
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Statistiques indisponibles"));
+  }, [espaceId]);
+  if (err) return <p className="muted" style={{ color: "var(--danger, #c0392b)" }}>{err}</p>;
   if (!s) return <p className="muted">Chargement…</p>;
 
   const total = s.cartes || 1;
