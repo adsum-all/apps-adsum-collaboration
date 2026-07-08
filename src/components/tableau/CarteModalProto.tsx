@@ -8,6 +8,7 @@ import {
   deplacerCarteVersTableau,
   duplicateCarte,
   listTableauxEspace,
+  publierCarteEnActivite,
   marquerCommentairesLus,
   reagirCommentaire,
   toggleArchiveCarte,
@@ -40,12 +41,17 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   const [mentionFrag, setMentionFrag] = useState("");
   const [tableauxCible, setTableauxCible] = useState<TableauProto[]>([]);
   const [showMove, setShowMove] = useState(false);
+  const [showPublier, setShowPublier] = useState(false);
+  const [publierDate, setPublierDate] = useState(carte.echeance ? carte.echeance.slice(0, 10) : (carte.debut ? carte.debut.slice(0, 10) : ""));
+  const [publierErr, setPublierErr] = useState<string | null>(null);
+  const [publieOk, setPublieOk] = useState(Boolean(carte.publie));
   const inputComRef = useRef<HTMLInputElement | null>(null);
 
   const role = roleDansEspace(espace, moiId);
   const peutEditer = peut(espace, role, "editer_carte");
   const peutCommenter = peut(espace, role, "commenter");
   const peutArchiver = peut(espace, role, "archiver");
+  const peutPublier = peut(espace, role, "publier_evenement");
 
   useEffect(() => {
     void marquerCommentairesLus(carte.id).then(() => onChanged());
@@ -261,7 +267,7 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
               )}
             </div>
 
-            {(peutEditer || peutArchiver) && (
+            {(peutEditer || peutArchiver || peutPublier) && (
               <div className="modal-actions" style={{ flexWrap: "wrap" }}>
                 {peutEditer && (
                   <button type="button" className="btn btn-ghost btn-inline" onClick={async () => {
@@ -271,6 +277,13 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                 {peutEditer && (
                   <button type="button" className="btn btn-ghost btn-inline" onClick={() => setShowMove((v) => !v)}>
                     Déplacer vers un tableau…
+                  </button>
+                )}
+                {publieOk ? (
+                  <span className="chip chip-ok" title="Cette carte a été publiée en activité">Publiée en activité</span>
+                ) : peutPublier && (
+                  <button type="button" className="btn btn-ghost btn-inline" onClick={() => { setShowPublier((v) => !v); setPublierErr(null); }}>
+                    Publier en activité…
                   </button>
                 )}
                 {peutArchiver && (
@@ -302,6 +315,30 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                       <option key={t.id} value={t.id}>{t.nom}</option>
                     ))}
                   </select>
+                )}
+                {showPublier && !publieOk && (
+                  <div className="publier-panneau" style={{ width: "100%", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                    <span className="small muted">Publier « {carte.titre} » comme activité pour tous les membres, à la date :</span>
+                    <input type="date" value={publierDate} onChange={(e) => setPublierDate(e.target.value)} />
+                    <button type="button" className="btn btn-primary btn-inline" disabled={!publierDate} onClick={async () => {
+                      setPublierErr(null);
+                      try {
+                        await publierCarteEnActivite(carte.id, {
+                          cible_type: "general",
+                          debut: new Date(publierDate).toISOString(),
+                        });
+                        setPublieOk(true);
+                        setShowPublier(false);
+                        await onChanged();
+                      } catch (err) {
+                        setPublierErr(err instanceof Error ? err.message : "Publication impossible");
+                      }
+                    }}>Publier</button>
+                    <span className="small muted" style={{ width: "100%" }}>
+                      L'activité est ajoutée à l'agenda des membres et les membres de l'espace sont notifiés. Le ciblage par unité (coordination, commission, tribu) se choisit dans le back office.
+                    </span>
+                    {publierErr && <span className="small" style={{ color: "var(--danger, #c0392b)", width: "100%" }}>{publierErr}</span>}
+                  </div>
                 )}
               </div>
             )}
