@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { listCartesAvecEcheance, listEspaces } from "../../lib/store.js";
+import { type ActivitePubliee, listActivitesPubliees, listCartesAvecEcheance, listEspaces } from "../../lib/store.js";
 import type { CarteProto, Espace, Priorite } from "../../lib/types.js";
 import { EmptyState } from "../common/EmptyState.js";
 
 type CarteCal = CarteProto & { espace_id: string | null };
+type ItemCal = { kind: "carte"; carte: CarteCal } | { kind: "activite"; act: ActivitePubliee };
 
 interface Props {
   scopeEspaceId?: string | null;
@@ -19,6 +20,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
   const [annee, setAnnee] = useState(today.getFullYear());
   const [mois, setMois] = useState(today.getMonth());
   const [cartes, setCartes] = useState<CarteCal[]>([]);
+  const [activites, setActivites] = useState<ActivitePubliee[]>([]);
   const [espaces, setEspaces] = useState<Espace[]>([]);
   const [filtreEspace, setFiltreEspace] = useState<string>(scopeEspaceId ?? "tous");
   const [filtreEtiquette, setFiltreEtiquette] = useState<string>("toutes");
@@ -26,6 +28,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
 
   useEffect(() => {
     void listCartesAvecEcheance().then(setCartes);
+    void listActivitesPubliees().then(setActivites);
     void listEspaces().then(setEspaces);
   }, []);
 
@@ -45,18 +48,29 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
     });
   }, [cartes, filtreEspace, filtreEtiquette, filtrePriorite]);
 
+  // Published activities respect the space filter only: they are real events, not
+  // bound to a card's label or priority.
+  const activitesFiltrees = useMemo(
+    () => activites.filter((a) => filtreEspace === "tous" || a.espace_id === filtreEspace),
+    [activites, filtreEspace],
+  );
+
   const grille = useMemo(() => buildGrille(annee, mois), [annee, mois]);
   const parJour = useMemo(() => {
-    const m = new Map<string, CarteCal[]>();
-    cartesFiltrees.forEach((c) => {
-      if (!c.echeance) return;
-      const key = c.echeance.slice(0, 10);
+    const m = new Map<string, ItemCal[]>();
+    const push = (key: string, item: ItemCal): void => {
       const list = m.get(key) ?? [];
-      list.push(c);
+      list.push(item);
       m.set(key, list);
+    };
+    cartesFiltrees.forEach((c) => {
+      if (c.echeance) push(c.echeance.slice(0, 10), { kind: "carte", carte: c });
+    });
+    activitesFiltrees.forEach((a) => {
+      if (a.debut) push(a.debut.slice(0, 10), { kind: "activite", act: a });
     });
     return m;
-  }, [cartesFiltrees]);
+  }, [cartesFiltrees, activitesFiltrees]);
 
   function nav(delta: number): void {
     const d = new Date(annee, mois + delta, 1);
@@ -70,7 +84,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
     <div className="page page-wide">
       <header className="page-head">
         <h1>Calendrier des activités</h1>
-        <p className="muted">Toutes les échéances des cartes auxquelles vous avez accès.</p>
+        <p className="muted">Les échéances de vos cartes et les activités publiées, comme dans l'agenda des membres.</p>
       </header>
 
       <div className="cal-toolbar">
@@ -110,8 +124,8 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
         </div>
       </div>
 
-      {cartesFiltrees.length === 0 && (
-        <EmptyState titre="Aucune activité programmée" description="Ajoutez une échéance à vos cartes pour les voir apparaître ici." />
+      {cartesFiltrees.length === 0 && activitesFiltrees.length === 0 && (
+        <EmptyState titre="Aucune activité programmée" description="Ajoutez une échéance à vos cartes, ou publiez une carte en activité, pour les voir apparaître ici." />
       )}
 
       <div className="cal-grid" role="grid" aria-label={`Calendrier ${MOIS[mois]} ${annee}`}>
@@ -124,11 +138,28 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
             <div key={key} className={`cal-cell${jour ? "" : " cal-cell-vide"}${estAujourdhui ? " cal-cell-today" : ""}`}>
               {jour && <div className="cal-cell-num">{jour}</div>}
               <div className="cal-cell-items">
-                {items.slice(0, 4).map((c) => {
+                {items.slice(0, 4).map((item) => {
+                  if (item.kind === "activite") {
+                    const a = item.act;
+                    const esp = espaceOf(a.espace_id);
+                    return (
+                      <button
+                        key={`a-${a.id}`}
+                        type="button"
+                        className="cal-event cal-event-activite"
+                        style={{ background: esp?.couleur ?? "#4b5563", color: "#fff" }}
+                        onClick={() => onOuvrirCarte && a.espace_id && onOuvrirCarte(a.espace_id, a.tableau_id, a.carte_id)}
+                        title={`Activité publiée${esp ? " · " + esp.nom : ""} · ${a.titre}`}
+                      >
+                        <span className="cal-event-titre">◆ {a.titre}</span>
+                      </button>
+                    );
+                  }
+                  const c = item.carte;
                   const esp = espaceOf(c.espace_id);
                   return (
                     <button
-                      key={c.id}
+                      key={`c-${c.id}`}
                       type="button"
                       className={`cal-event cal-event-${c.priorite}`}
                       style={esp ? { borderLeftColor: esp.couleur } : undefined}

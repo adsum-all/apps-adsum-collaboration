@@ -43,6 +43,7 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   const [showMove, setShowMove] = useState(false);
   const [showPublier, setShowPublier] = useState(false);
   const [publierDate, setPublierDate] = useState(carte.echeance ? carte.echeance.slice(0, 10) : (carte.debut ? carte.debut.slice(0, 10) : ""));
+  const [publierType, setPublierType] = useState<"rassemblement" | "formation" | "priere">("rassemblement");
   const [publierErr, setPublierErr] = useState<string | null>(null);
   const [publieOk, setPublieOk] = useState(Boolean(carte.publie));
   const inputComRef = useRef<HTMLInputElement | null>(null);
@@ -318,13 +319,21 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                 )}
                 {showPublier && !publieOk && (
                   <div className="publier-panneau" style={{ width: "100%", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                    <span className="small muted">Publier « {carte.titre} » comme activité pour tous les membres, à la date :</span>
+                    <span className="small muted">Publier « {carte.titre} » comme activité pour tous les membres :</span>
+                    <label className="small muted">Type</label>
+                    <select value={publierType} onChange={(e) => setPublierType(e.target.value as typeof publierType)}>
+                      <option value="rassemblement">Rassemblement</option>
+                      <option value="formation">Formation</option>
+                      <option value="priere">Prière</option>
+                    </select>
+                    <label className="small muted">Date</label>
                     <input type="date" value={publierDate} onChange={(e) => setPublierDate(e.target.value)} />
                     <button type="button" className="btn btn-primary btn-inline" disabled={!publierDate} onClick={async () => {
                       setPublierErr(null);
                       try {
                         await publierCarteEnActivite(carte.id, {
                           cible_type: "general",
+                          type: publierType,
                           debut: new Date(publierDate).toISOString(),
                         });
                         setPublieOk(true);
