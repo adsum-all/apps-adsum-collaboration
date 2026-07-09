@@ -20,6 +20,9 @@ export function updateColonne(id: string, patch: Partial<ColonneProto>): Promise
 export function deleteColonne(id: string): Promise<void> {
   return request(`${B}/colonnes/${id}`, { method: "DELETE" }, "Colonne non supprimee");
 }
+export function reordonnerColonnes(tableauId: string, ordre: string[]): Promise<void> {
+  return request(`${B}/tableaux/${tableauId}/colonnes/ordre`, { method: "POST", body: jbody({ ordre }) }, "Reordonnancement impossible");
+}
 
 // Cards
 export function listCartes(tableauId: string): Promise<CarteProto[]> {

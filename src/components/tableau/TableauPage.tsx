@@ -10,6 +10,7 @@ import {
   listColonnes,
   listMembres,
   moveCarte,
+  reordonnerColonnes,
   toggleArchiveCarte,
   updateColonne,
   updateTableauProto,
@@ -43,6 +44,8 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
   const [newColonneNom, setNewColonneNom] = useState("");
   const [drag, setDrag] = useState<{ carteId: string; from: string } | null>(null);
   const [dragOver, setDragOver] = useState<{ colonneId: string; index: number } | null>(null);
+  const [colDrag, setColDrag] = useState<string | null>(null);
+  const [colOver, setColOver] = useState<string | null>(null);
   const [fRecherche, setFRecherche] = useState("");
   const [fPriorite, setFPriorite] = useState<string>("");
   const [fEtiquette, setFEtiquette] = useState<string>("");
@@ -82,6 +85,18 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
     setCartes(k);
     setCartesArchivees(ka);
   }, [tableauId]);
+
+  async function reorderColonne(targetColId: string): Promise<void> {
+    const dragged = colDrag;
+    setColDrag(null);
+    setColOver(null);
+    if (!dragged || dragged === targetColId) return;
+    const ids = colonnes.map((c) => c.id).filter((id) => id !== dragged);
+    const at = ids.indexOf(targetColId);
+    ids.splice(at < 0 ? ids.length : at, 0, dragged);
+    await reordonnerColonnes(tableauId, ids);
+    await reload();
+  }
 
   useEffect(() => {
     void reload();
@@ -297,6 +312,11 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
               onDragEnd={() => { setDrag(null); setDragOver(null); }}
               onDragOverIndex={(index) => setDragOver({ colonneId: col.id, index })}
               onDrop={(index) => void drop(col.id, index)}
+              draggingCol={colDrag != null}
+              colSurvole={colOver === col.id && colDrag != null && colDrag !== col.id}
+              onColDragStart={() => setColDrag(col.id)}
+              onColDragOver={() => setColOver(col.id)}
+              onColDrop={() => void reorderColonne(col.id)}
               onOpen={setOpenCardId}
               onCreated={reload}
               onRename={async (nom) => { await updateColonne(col.id, { nom }); await reload(); }}
@@ -377,6 +397,11 @@ interface ColonneVueProps {
   onRename: (nom: string) => Promise<void>;
   onUpdate: (patch: Partial<ColonneProto>) => Promise<void>;
   onDelete: () => Promise<void>;
+  draggingCol: boolean;
+  colSurvole: boolean;
+  onColDragStart: () => void;
+  onColDragOver: () => void;
+  onColDrop: () => void;
 }
 
 
@@ -399,6 +424,11 @@ function ColonneVue({
   onRename,
   onUpdate,
   onDelete,
+  draggingCol,
+  colSurvole,
+  onColDragStart,
+  onColDragOver,
+  onColDrop,
 }: ColonneVueProps): JSX.Element {
   const [titre, setTitre] = useState("");
   const [editNom, setEditNom] = useState(false);
@@ -423,9 +453,18 @@ function ColonneVue({
   const couleurs = [null, "#94a3b8", "#3b82f6", "#22c55e", "#f59e0b", "#c0392b", "#a855f7"];
 
   return (
-    <section className={`kanban-col${colonne.repliee ? " kanban-col-repliee" : ""}${wipDepasse ? " kanban-col-wip-over" : ""}`}>
+    <section
+      className={`kanban-col${colonne.repliee ? " kanban-col-repliee" : ""}${wipDepasse ? " kanban-col-wip-over" : ""}`}
+      onDragOver={(e) => { if (draggingCol) { e.preventDefault(); onColDragOver(); } }}
+      onDrop={(e) => { if (draggingCol) { e.preventDefault(); onColDrop(); } }}
+      style={colSurvole ? { boxShadow: "inset 3px 0 0 0 var(--accent, #0EA5E9)" } : undefined}
+    >
       {colonne.couleur && <div className="kanban-col-bar" style={{ background: colonne.couleur }} aria-hidden="true" />}
       <header className="kanban-col-head">
+        {peutGererCol && !editNom && (
+          <span draggable title="Deplacer la colonne" onDragStart={onColDragStart}
+            style={{ cursor: "grab", color: "var(--muted, #9aa4b2)", userSelect: "none", paddingRight: 2 }}>≡</span>
+        )}
 
         {editNom && peutGererCol ? (
           <input
