@@ -9,21 +9,15 @@ import {
   modifierActivite,
 } from "../../lib/store.js";
 import { detectPlatform } from "../../lib/platform.js";
+import { FUSEAUX } from "../../lib/fuseaux.js";
+import { utcToZoned, zonedToUtc } from "../../lib/tz.js";
 import { RichEditor } from "../common/RichEditor.js";
 
 // The full activity/event form, reproduced from the back office so an activity can
 // be programmed or edited from collaboration with EXACTLY the same fields, plus a
 // rich description, contributors and automatic broadcast-source detection. Aired,
 // single-column and scrollable for real usability. Reaches the same shared engine.
-
-const FUSEAUX: [string, string][] = [
-  ["Africa/Abidjan", "Côte d'Ivoire (GMT)"],
-  ["Africa/Lagos", "Lagos (GMT+1)"],
-  ["Europe/Paris", "Paris (GMT+1/+2)"],
-  ["Europe/London", "Londres (GMT+0/+1)"],
-  ["America/New_York", "New York (GMT-5/-4)"],
-  ["America/Montreal", "Montréal (GMT-5/-4)"],
-];
+// Times are typed in the activity's own zone and converted to UTC like the BO.
 
 const CIBLE_LABELS: Record<string, string> = {
   general: "Toute la communauté (général)",
@@ -36,14 +30,6 @@ const CIBLE_LABELS: Record<string, string> = {
   liste: "Liste d'adresses e-mail (groupe ad hoc)",
 };
 const CIBLE_UNITES = ["coordination", "commission", "intendance", "tribu"];
-
-function isoToLocal(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function Champ({ label, aide, children, full }: { label: string; aide?: string; children: JSX.Element; full?: boolean }): JSX.Element {
   return (
@@ -62,10 +48,11 @@ interface Props {
 }
 
 export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.Element {
+  const zone0 = detail?.fuseau_horaire ?? "Africa/Abidjan";
   const [titre, setTitre] = useState(detail?.titre ?? "");
-  const [zone, setZone] = useState(detail?.fuseau_horaire ?? "Africa/Abidjan");
-  const [debut, setDebut] = useState(isoToLocal(detail?.debut ?? null));
-  const [fin, setFin] = useState(isoToLocal(detail?.fin ?? null));
+  const [zone, setZone] = useState(zone0);
+  const [debut, setDebut] = useState(detail?.debut ? utcToZoned(detail.debut, zone0) : "");
+  const [fin, setFin] = useState(detail?.fin ? utcToZoned(detail.fin, zone0) : "");
   const [lieu, setLieu] = useState(detail?.lieu ?? "");
   const [type, setType] = useState(detail?.type ?? "rassemblement");
   const [mode, setMode] = useState(detail?.mode ?? "presentiel");
@@ -124,7 +111,7 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
       return;
     }
     const cleanLiens = liens.map((l) => l.trim()).filter(Boolean);
-    const debutIso = new Date(debut).toISOString();
+    const debutIso = zonedToUtc(debut, zone);
     const payload: EvenementPayload = {
       titre: titre.trim(),
       volet,
@@ -145,7 +132,7 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
       intervenant_principal: principal.trim() || null,
       intervenants: intervenants.map((x) => x.trim()).filter(Boolean),
     };
-    if (fin) payload.fin = new Date(fin).toISOString();
+    if (fin) payload.fin = zonedToUtc(fin, zone);
     if (lieu.trim()) payload.lieu = lieu.trim();
     if (cleanLiens.length > 0) {
       payload.liens = cleanLiens;
@@ -156,7 +143,7 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
     if (!estEdition && repetition !== "aucune" && n > 0) {
       const stepMs = (repetition === "hebdomadaire" ? 7 : 1) * 24 * 3600 * 1000;
       const base = new Date(debutIso).getTime();
-      const baseFin = fin ? new Date(new Date(fin).toISOString()).getTime() : null;
+      const baseFin = fin ? new Date(zonedToUtc(fin, zone)).getTime() : null;
       const occs = [];
       for (let i = 1; i <= Math.min(n, 51); i++) {
         const occ: { debut: string; fin?: string | null } = { debut: new Date(base + i * stepMs).toISOString() };
