@@ -298,6 +298,12 @@
 }
 
 @media (max-width: 720px) {
+  .modal-backdrop {
+    padding: 6px;
+  }
+  .modal {
+    max-height: 96dvh;
+  }
   .modal-body {
     grid-template-columns: 1fr;
     overflow-y: auto;
@@ -306,6 +312,37 @@
     border-left: none;
     border-top: 1px solid var(--adsum-line);
   }
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-head {
+    padding: 12px 14px;
+  }
+  .modal-form {
+    padding: 14px;
+  }
+}
+
+/* Never let the card modal scroll horizontally: constrain every child to the
+   column width and keep popovers inside the viewport on small screens. */
+.modal-form {
+  min-width: 0;
+  overflow-x: hidden;
+}
+.modal-form > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.modal-titre-input {
+  max-width: 100%;
+}
+.mention-pop {
+  max-width: 82vw;
+}
+.rich-read img,
+.modal-form img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Jalon 3+ : DnD, cartes riches, modale enrichie, tuiles favoris */
