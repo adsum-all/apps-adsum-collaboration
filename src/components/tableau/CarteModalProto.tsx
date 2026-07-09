@@ -12,6 +12,7 @@ import {
   publierCarteEnActivite,
   marquerCommentairesLus,
   reagirCommentaire,
+  reordonnerChecklistItems,
   supprimerChecklist,
   supprimerCommentaire,
   toggleArchiveCarte,
@@ -52,6 +53,22 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   const [publieOk, setPublieOk] = useState(Boolean(carte.publie));
   const inputComRef = useRef<HTMLInputElement | null>(null);
   const [editCom, setEditCom] = useState<{ id: string; corps: string } | null>(null);
+  const [itemDrag, setItemDrag] = useState<{ checklistId: string; itemId: string } | null>(null);
+  const [itemOver, setItemOver] = useState<string | null>(null);
+
+  async function reorderItem(checklistId: string, targetItemId: string): Promise<void> {
+    const drag = itemDrag;
+    setItemOver(null);
+    setItemDrag(null);
+    if (!drag || drag.checklistId !== checklistId || drag.itemId === targetItemId) return;
+    const cl = carte.checklists.find((c) => c.id === checklistId);
+    if (!cl) return;
+    const ids = cl.items.map((i) => i.id).filter((id) => id !== drag.itemId);
+    const at = ids.indexOf(targetItemId);
+    ids.splice(at < 0 ? ids.length : at, 0, drag.itemId);
+    await reordonnerChecklistItems(checklistId, ids);
+    await onChanged();
+  }
 
   const role = roleDansEspace(espace, moiId);
   const peutEditer = peut(espace, role, "editer_carte");
@@ -234,7 +251,11 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                     <ul>
                       {cl.items.map((it) => (
                         <ChecklistItemRow key={it.id} item={it} carteId={carte.id} checklistId={cl.id}
-                          membres={membresEspace} peutEditer={peutEditer} onChanged={onChanged} />
+                          membres={membresEspace} peutEditer={peutEditer} onChanged={onChanged}
+                          onDragStartItem={() => setItemDrag({ checklistId: cl.id, itemId: it.id })}
+                          onDragOverItem={() => setItemOver(it.id)}
+                          onDropItem={() => void reorderItem(cl.id, it.id)}
+                          survole={itemOver === it.id && itemDrag != null && itemDrag.itemId !== it.id} />
                       ))}
                     </ul>
                     {peutEditer && (

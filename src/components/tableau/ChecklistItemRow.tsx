@@ -15,12 +15,16 @@ interface Props {
   membres: Membre[];
   peutEditer: boolean;
   onChanged: () => Promise<void> | void;
+  onDragStartItem?: () => void;
+  onDragOverItem?: () => void;
+  onDropItem?: () => void;
+  survole?: boolean;
 }
 
 // A single checklist item: completion, inline title, assignee avatars (multiple,
 // toggled from an avatar picker) and an overflow "..." menu holding the due date,
 // convert-to-card and delete actions. Keeps the row uncluttered and ergonomic.
-export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEditer, onChanged }: Props): JSX.Element {
+export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEditer, onChanged, onDragStartItem, onDragOverItem, onDropItem, survole }: Props): JSX.Element {
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -44,8 +48,19 @@ export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEdit
   const assignesMembres = membres.filter((m) => assignes.includes(m.id));
 
   return (
-    <li style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "3px 0", flexWrap: "wrap" }}>
-      <label className="switch-row" style={{ flex: "1 1 60%", minWidth: 0, alignItems: "flex-start" }}>
+    <li
+      onDragOver={(e) => { if (onDragOverItem) { e.preventDefault(); onDragOverItem(); } }}
+      onDrop={(e) => { if (onDropItem) { e.preventDefault(); onDropItem(); } }}
+      style={{
+        display: "flex", alignItems: "flex-start", gap: 8, padding: "3px 0", flexWrap: "wrap",
+        borderTop: survole ? "2px solid var(--accent, #0EA5E9)" : "2px solid transparent",
+      }}
+    >
+      {peutEditer && onDragStartItem && (
+        <span draggable title="Déplacer" onDragStart={onDragStartItem}
+          style={{ cursor: "grab", color: "var(--muted, #9aa4b2)", padding: "0 2px", userSelect: "none", lineHeight: "20px" }}>≡</span>
+      )}
+      <label className="switch-row" style={{ flex: "1 1 55%", minWidth: 0, alignItems: "flex-start" }}>
         <input type="checkbox" checked={item.fait} disabled={!peutEditer || busy}
           onChange={() => void run(toggleChecklistItem(carteId, checklistId, item.id))} />
         <span className={item.fait ? "checklist-fait" : ""}>{item.texte}</span>
