@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { type ActivitePubliee, creerActivite, listActivitesPubliees, listCartesAvecEcheance, listEspaces, peutGererActivites } from "../../lib/store.js";
+import { type ActivitePubliee, listActivitesPubliees, listCartesAvecEcheance, listEspaces, peutGererActivites } from "../../lib/store.js";
 import type { CarteProto, Espace, Priorite } from "../../lib/types.js";
 import { EmptyState } from "../common/EmptyState.js";
 import { ActiviteModal } from "./ActiviteModal.js";
+import { ActiviteFormComplet } from "./ActiviteFormComplet.js";
 
 type CarteCal = CarteProto & { espace_id: string | null };
 type ItemCal = { kind: "carte"; carte: CarteCal } | { kind: "activite"; act: ActivitePubliee };
@@ -27,12 +28,6 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
   const [filtreEtiquette, setFiltreEtiquette] = useState<string>("toutes");
   const [filtrePriorite, setFiltrePriorite] = useState<Priorite | "toutes">("toutes");
   const [showForm, setShowForm] = useState(false);
-  const [fTitre, setFTitre] = useState("");
-  const [fType, setFType] = useState<"rassemblement" | "formation" | "priere">("rassemblement");
-  const [fDate, setFDate] = useState("");
-  const [fLieu, setFLieu] = useState("");
-  const [fErr, setFErr] = useState<string | null>(null);
-  const [fBusy, setFBusy] = useState(false);
   const [activiteOuverte, setActiviteOuverte] = useState<string | null>(null);
 
   const rechargerActivites = (): void => {
@@ -44,34 +39,6 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
     void listActivitesPubliees().then(setActivites);
     void listEspaces().then(setEspaces);
   }, []);
-
-  async function soumettreActivite(): Promise<void> {
-    setFErr(null);
-    if (!fTitre.trim() || !fDate) {
-      setFErr("Titre et date requis.");
-      return;
-    }
-    setFBusy(true);
-    try {
-      await creerActivite({
-        titre: fTitre.trim(),
-        type: fType,
-        debut: new Date(fDate).toISOString(),
-        lieu: fLieu.trim() || null,
-        cible_type: "general",
-        visibilite: "membres",
-      });
-      setShowForm(false);
-      setFTitre("");
-      setFLieu("");
-      setFDate("");
-      rechargerActivites();
-    } catch (err) {
-      setFErr(err instanceof Error ? err.message : "Activité non créée");
-    } finally {
-      setFBusy(false);
-    }
-  }
 
   const etiquettes = useMemo(() => {
     const src = filtreEspace !== "tous" ? espaces.filter((e) => e.id === filtreEspace) : espaces;
@@ -135,7 +102,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
           <button type="button" className="btn btn-ghost btn-inline" onClick={() => nav(1)} aria-label="Mois suivant">›</button>
           <button type="button" className="btn btn-ghost btn-inline" onClick={() => { setAnnee(today.getFullYear()); setMois(today.getMonth()); }}>Aujourd'hui</button>
           {peutGererActivites() && (
-            <button type="button" className="btn btn-primary btn-inline" onClick={() => { setShowForm((v) => !v); setFErr(null); }}>+ Nouvelle activité</button>
+            <button type="button" className="btn btn-primary btn-inline" onClick={() => setShowForm(true)}>+ Nouvelle activité</button>
           )}
         </div>
         <div className="cal-filtres">
@@ -169,34 +136,20 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
       </div>
 
       {showForm && (
-        <div className="carte-form" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end", padding: 12, border: "1px solid var(--border, #e2e2e2)", borderRadius: 10, marginBottom: 12 }}>
-          <label>
-            <span className="muted small">Titre</span>
-            <input type="text" value={fTitre} onChange={(e) => setFTitre(e.target.value)} placeholder="Nom de l'activité" />
-          </label>
-          <label>
-            <span className="muted small">Type</span>
-            <select value={fType} onChange={(e) => setFType(e.target.value as typeof fType)}>
-              <option value="rassemblement">Rassemblement</option>
-              <option value="formation">Formation</option>
-              <option value="priere">Prière</option>
-            </select>
-          </label>
-          <label>
-            <span className="muted small">Date</span>
-            <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} />
-          </label>
-          <label>
-            <span className="muted small">Lieu</span>
-            <input type="text" value={fLieu} onChange={(e) => setFLieu(e.target.value)} placeholder="Optionnel" />
-          </label>
-          <button type="button" className="btn btn-primary btn-inline" disabled={fBusy} onClick={() => void soumettreActivite()}>
-            {fBusy ? "Création..." : "Créer l'activité"}
-          </button>
-          <span className="muted small" style={{ width: "100%" }}>
-            L'activité est programmée pour tous les membres et apparaît dans tous les calendriers (back office, membres).
-          </span>
-          {fErr && <span className="small" style={{ color: "var(--danger, #c0392b)", width: "100%" }}>{fErr}</span>}
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowForm(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--bg, #fff)", color: "var(--fg, #111)", borderRadius: 12, padding: 20, width: "min(680px, 94vw)", maxHeight: "90vh", overflow: "auto" }}>
+            <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Nouvelle activité</h2>
+              <button type="button" className="btn btn-ghost btn-inline" onClick={() => setShowForm(false)} aria-label="Fermer">✕</button>
+            </header>
+            <ActiviteFormComplet
+              detail={null}
+              onDone={() => { setShowForm(false); rechargerActivites(); }}
+              onCancel={() => setShowForm(false)}
+            />
+          </div>
         </div>
       )}
 

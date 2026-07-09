@@ -154,47 +154,87 @@ export function listActivitesPubliees(): Promise<ActivitePubliee[]> {
   return request(`${B}/activites`, { method: "GET" }, "Activités indisponibles");
 }
 
-/** Fields to program a real activity from the collaboration app. It lands in the
- * same evenement table as the back office, so it appears in every calendar. */
-export interface ActiviteInput {
+/** The FULL event payload, identical to the back-office event form: the same
+ * fields, targeting, diffusion, response window and recurrence, so an activity
+ * created from collaboration is exactly like one created from the back office. */
+export interface EvenementPayload {
   titre: string;
-  type: "rassemblement" | "formation" | "priere";
+  volet?: string;
   debut: string;
-  lieu?: string | null;
-  cible_type?: "general";
+  fin?: string;
+  lieu?: string;
+  type?: string;
+  mode?: string;
+  lien_session?: string;
+  liens?: string[];
+  type_diffusion?: "aucun" | "embed" | "externe";
   visibilite?: "public" | "membres" | "prive";
+  cible_type?: "general" | "coordination" | "commission" | "intendance" | "tribu" | "bergers" | "responsables" | "liste";
+  cible_id?: string | null;
+  cible_genre?: "homme" | "femme" | null;
+  cible_age_min?: number | null;
+  cible_age_max?: number | null;
+  cible_emails?: string[];
+  fenetre_reponse_heures?: number | null;
+  fuseau_horaire?: string;
+  occurrences?: { debut: string; fin?: string | null; mode?: string | null }[];
 }
 
-export function creerActivite(input: ActiviteInput): Promise<{ id: string }> {
+export function creerActivite(input: EvenementPayload): Promise<{ id: string }> {
   return request(`${B}/activites`, { method: "POST", body: jbody(input) }, "Activité non créée");
 }
 
-export interface ActiviteDetailData {
+/** One activity's full details (same shape as the back office), to pre-fill the
+ * collaboration edit form with every field. */
+export interface EvenementDetail {
   id: string;
   titre: string;
   type: string | null;
-  debut: string | null;
+  volet: string;
+  debut: string;
   fin: string | null;
   lieu: string | null;
-  cible_type: string | null;
-  visibilite: string | null;
+  mode: string | null;
+  lien_session: string | null;
+  liens: string[];
+  type_diffusion: string;
+  visibilite: string;
+  cible_type: string;
+  cible_id: string | null;
+  cible_genre: string | null;
+  cible_age_min: number | null;
+  cible_age_max: number | null;
+  cible_emails: string[];
+  fenetre_reponse_heures: number | null;
+  fuseau_horaire: string;
+  serie_id: string | null;
   annule: boolean;
 }
-
-/** One activity's editable fields (from the shared evenement table), whatever app
- * created it. Editing/cancelling is allowed from collaboration with the same rights
- * as the back office (parity). */
-export function detailActivite(id: string): Promise<ActiviteDetailData> {
+export function detailActivite(id: string): Promise<EvenementDetail> {
   return request(`${B}/activites/${id}`, { method: "GET" }, "Activité indisponible");
 }
 export function modifierActivite(
   id: string,
-  patch: { titre?: string; type?: string; debut?: string; lieu?: string | null },
-): Promise<{ id: string }> {
-  return request(`${B}/activites/${id}`, { method: "PATCH", body: jbody(patch) }, "Activité non modifiée");
+  payload: EvenementPayload,
+  portee?: "toute_la_serie",
+): Promise<EvenementDetail> {
+  const q = portee ? "?portee=toute_la_serie" : "";
+  return request(`${B}/activites/${id}${q}`, { method: "PUT", body: jbody(payload) }, "Activité non modifiée");
 }
 export function annulerActivite(id: string): Promise<{ id: string }> {
   return request(`${B}/activites/${id}/annuler`, { method: "POST" }, "Annulation impossible");
+}
+
+// Organisational units an activity can target, for the audience picker.
+export interface CibleUnite { id: string; nom: string }
+export interface Cibles {
+  coordinations: CibleUnite[];
+  commissions: CibleUnite[];
+  intendances: CibleUnite[];
+  tribus: CibleUnite[];
+}
+export function listCibles(): Promise<Cibles> {
+  return request(`${B}/cibles`, { method: "GET" }, "Unités indisponibles");
 }
 
 // The signed-in account's platform permissions, cached, so the UI knows whether it
