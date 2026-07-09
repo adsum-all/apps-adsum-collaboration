@@ -4,26 +4,24 @@ import {
   ajouterChecklist,
   ajouterChecklistItem,
   ajouterCommentaire,
-  convertirItemEnCarte,
   deleteCarteProto,
   deplacerCarteVersTableau,
   duplicateCarte,
   listTableauxEspace,
-  modifierChecklistItem,
   modifierCommentaire,
   publierCarteEnActivite,
   marquerCommentairesLus,
   reagirCommentaire,
   supprimerChecklist,
-  supprimerChecklistItem,
   supprimerCommentaire,
   toggleArchiveCarte,
-  toggleChecklistItem,
   updateCarteProto,
 } from "../../lib/store.js";
 import { peut, roleDansEspace } from "../../lib/permissions.js";
 import type { CarteProto, Espace, Membre, Priorite, TableauProto } from "../../lib/types.js";
 import { PiecesCarte } from "./PiecesCarte.js";
+import { DescriptionEditor } from "./DescriptionEditor.js";
+import { ChecklistItemRow } from "./ChecklistItemRow.js";
 
 interface Props {
   carte: CarteProto;
@@ -38,7 +36,6 @@ const PRIOS: Priorite[] = ["urgente", "haute", "normale", "basse"];
 
 export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChanged }: Props): JSX.Element {
   const [titre, setTitre] = useState(carte.titre);
-  const [description, setDescription] = useState(carte.description);
   const [echeance, setEcheance] = useState(carte.echeance ? carte.echeance.slice(0, 10) : "");
   const [priorite, setPriorite] = useState<Priorite>(carte.priorite);
   const [nouveauCom, setNouveauCom] = useState("");
@@ -153,18 +150,12 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
 
         <div className="modal-body">
           <div className="modal-form">
-            <label>
-              <span>Description</span>
-              <textarea
-                className="textarea"
-                rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onBlur={() => description !== carte.description && void save({ description })}
-                disabled={!peutEditer}
-                placeholder="Contexte, décisions, liens..."
-              />
-            </label>
+            <DescriptionEditor
+              value={carte.description}
+              membres={membresEspace}
+              disabled={!peutEditer}
+              onSave={(html) => save({ description: html })}
+            />
 
             <div className="modal-grid">
               <label>
@@ -242,33 +233,8 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                     <div className="progress"><div className="progress-bar" style={{ width: `${pct}%` }} /></div>
                     <ul>
                       {cl.items.map((it) => (
-                        <li key={it.id}>
-                          <label className="switch-row">
-                            <input type="checkbox" checked={it.fait} disabled={!peutEditer}
-                              onChange={async () => { await toggleChecklistItem(carte.id, cl.id, it.id); await onChanged(); }} />
-                            <span className={it.fait ? "checklist-fait" : ""}>{it.texte}</span>
-                          </label>
-                          {peutEditer && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", margin: "2px 0 6px 26px" }}>
-                              <select aria-label="Assigné" value={it.assigne_id ?? ""} style={{ fontSize: 12 }}
-                                onChange={async (e) => { await modifierChecklistItem(it.id, { assigne_id: e.target.value || null }); await onChanged(); }}>
-                                <option value="">Non assigné</option>
-                                {membresEspace.map((m) => (<option key={m.id} value={m.id}>{m.nom}</option>))}
-                              </select>
-                              <input type="date" aria-label="Échéance item" style={{ fontSize: 12 }}
-                                value={it.echeance ? it.echeance.slice(0, 10) : ""}
-                                onChange={async (e) => { await modifierChecklistItem(it.id, { echeance: e.target.value ? new Date(e.target.value).toISOString() : null }); await onChanged(); }} />
-                              <button type="button" className="btn btn-ghost btn-inline" style={{ fontSize: 11 }}
-                                onClick={async () => { await convertirItemEnCarte(it.id); await onChanged(); }} title="Convertir en carte">
-                                Convertir en carte
-                              </button>
-                              <button type="button" className="btn btn-ghost btn-inline" style={{ fontSize: 11 }}
-                                onClick={async () => { await supprimerChecklistItem(it.id); await onChanged(); }}>
-                                Supprimer
-                              </button>
-                            </div>
-                          )}
-                        </li>
+                        <ChecklistItemRow key={it.id} item={it} carteId={carte.id} checklistId={cl.id}
+                          membres={membresEspace} peutEditer={peutEditer} onChanged={onChanged} />
                       ))}
                     </ul>
                     {peutEditer && (

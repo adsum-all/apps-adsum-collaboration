@@ -149,7 +149,7 @@ export function supprimerChecklist(checklistId: string): Promise<void> {
 }
 export function modifierChecklistItem(
   itemId: string,
-  patch: { texte?: string; assigne_id?: string | null; echeance?: string | null },
+  patch: { texte?: string; assigne_id?: string | null; assignes?: string[]; echeance?: string | null },
 ): Promise<void> {
   return request(`${B}/checklist-items/${itemId}`, { method: "PATCH", body: jbody(patch) }, "Action impossible");
 }
