@@ -245,6 +245,25 @@ export function listCibles(): Promise<Cibles> {
   return request(`${B}/cibles`, { method: "GET" }, "Unités indisponibles");
 }
 
+// Activity attachments (images and files), shared with the back office.
+export interface PieceEvenement {
+  id: string;
+  nom: string;
+  type: string;
+  taille: number;
+  url: string;
+  cree_le?: string | null;
+}
+export function listPiecesActivite(id: string): Promise<PieceEvenement[]> {
+  return request(`${B}/activites/${id}/pieces`, { method: "GET" }, "Pièces indisponibles");
+}
+export function ajouterPieceActivite(id: string, piece: { nom: string; type: string; taille: number; data_url: string }): Promise<PieceEvenement> {
+  return request(`${B}/activites/${id}/pieces`, { method: "POST", body: jbody(piece) }, "Pièce non ajoutée");
+}
+export function supprimerPieceActivite(pieceId: string): Promise<void> {
+  return request(`${B}/activites/pieces/${pieceId}`, { method: "DELETE" }, "Suppression impossible");
+}
+
 // The signed-in account's platform permissions, cached, so the UI knows whether it
 // may create/edit activities (collaboration.gerer) rather than guessing from a role.
 let _permissions: string[] | null = null;

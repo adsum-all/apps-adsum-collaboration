@@ -8,6 +8,7 @@ import {
 } from "../../lib/store.js";
 import { detectPlatform } from "../../lib/platform.js";
 import { ActiviteFormComplet } from "./ActiviteFormComplet.js";
+import { PiecesEvenement } from "./PiecesEvenement.js";
 
 interface Props {
   activiteId: string;
@@ -128,6 +129,10 @@ export function ActiviteDrawer({ activiteId, onClose, onChanged }: Props): JSX.E
                   />
                 </div>
               )}
+
+              <div style={{ borderTop: "1px solid var(--border, #e2e2e2)", paddingTop: 12 }}>
+                <PiecesEvenement activiteId={activiteId} peutGerer={peutGerer && !d.annule} />
+              </div>
 
               {peutGerer && !d.annule && (
                 <div style={{ borderTop: "1px solid var(--border, #e2e2e2)", paddingTop: 12, display: "flex", gap: 8 }}>
