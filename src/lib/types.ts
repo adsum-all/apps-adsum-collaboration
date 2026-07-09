@@ -75,6 +75,7 @@ export interface ChecklistItem {
   texte: string;
   fait: boolean;
   assigne_id: string | null;
+  assignes: string[];
   echeance: string | null;
 }
 

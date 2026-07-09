@@ -1,0 +1,110 @@
+import { useState } from "react";
+
+import {
+  convertirItemEnCarte,
+  modifierChecklistItem,
+  supprimerChecklistItem,
+  toggleChecklistItem,
+} from "../../lib/store.js";
+import type { ChecklistItem, Membre } from "../../lib/types.js";
+
+interface Props {
+  item: ChecklistItem;
+  carteId: string;
+  checklistId: string;
+  membres: Membre[];
+  peutEditer: boolean;
+  onChanged: () => Promise<void> | void;
+}
+
+// A single checklist item: completion, inline title, assignee avatars (multiple,
+// toggled from an avatar picker) and an overflow "..." menu holding the due date,
+// convert-to-card and delete actions. Keeps the row uncluttered and ergonomic.
+export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEditer, onChanged }: Props): JSX.Element {
+  const [menu, setMenu] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const assignes = item.assignes ?? [];
+
+  async function run(p: Promise<unknown>): Promise<void> {
+    setBusy(true);
+    try {
+      await p;
+      await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleAssigne(id: string): void {
+    const next = assignes.includes(id) ? assignes.filter((x) => x !== id) : [...assignes, id];
+    void run(modifierChecklistItem(item.id, { assignes: next }));
+  }
+
+  const assignesMembres = membres.filter((m) => assignes.includes(m.id));
+
+  return (
+    <li style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "3px 0" }}>
+      <label className="switch-row" style={{ flex: 1, alignItems: "flex-start" }}>
+        <input type="checkbox" checked={item.fait} disabled={!peutEditer || busy}
+          onChange={() => void run(toggleChecklistItem(carteId, checklistId, item.id))} />
+        <span className={item.fait ? "checklist-fait" : ""}>{item.texte}</span>
+      </label>
+
+      {/* Assignee avatars ("petits bonhommes") */}
+      <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+        {assignesMembres.slice(0, 3).map((m) => (
+          <span key={m.id} className="avatar avatar-sm" title={m.nom}
+            style={{ marginLeft: -6, border: "2px solid var(--surface, #fff)" }}>{m.initiales}</span>
+        ))}
+        {assignesMembres.length > 3 && <span className="muted small" style={{ marginLeft: 2 }}>+{assignesMembres.length - 3}</span>}
+        {peutEditer && (
+          <button type="button" className="btn btn-ghost btn-inline" title="Assigner" disabled={busy}
+            style={{ marginLeft: 4, padding: "0 6px", fontSize: 13, lineHeight: "20px" }}
+            onClick={() => { setPicker((v) => !v); setMenu(false); }}>
+            {assignesMembres.length === 0 ? "+ qui ?" : "..."}
+          </button>
+        )}
+        {picker && (
+          <div className="mention-pop" style={{ position: "absolute", top: 26, right: 0, zIndex: 6, minWidth: 180 }}>
+            <span className="muted small" style={{ padding: "2px 8px" }}>Assigner (plusieurs possibles)</span>
+            {membres.map((m) => {
+              const on = assignes.includes(m.id);
+              return (
+                <button key={m.id} type="button" className="mention-item" onClick={() => toggleAssigne(m.id)}
+                  style={on ? { fontWeight: 600 } : undefined}>
+                  <span className="avatar avatar-sm">{m.initiales}</span>
+                  <span>{m.nom}</span>
+                  {on && <span style={{ marginLeft: "auto" }}>OK</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Overflow "..." menu: due date, convert, delete */}
+      {peutEditer && (
+        <div style={{ position: "relative" }}>
+          <button type="button" className="btn btn-ghost btn-inline" title="Actions" disabled={busy}
+            style={{ padding: "0 8px", fontSize: 16, lineHeight: "20px" }}
+            onClick={() => { setMenu((v) => !v); setPicker(false); }}>...</button>
+          {menu && (
+            <div className="mention-pop" style={{ position: "absolute", top: 26, right: 0, zIndex: 6, minWidth: 200, padding: 8 }}>
+              <label className="muted small" style={{ display: "block", marginBottom: 6 }}>
+                Echeance
+                <input type="date" style={{ display: "block", width: "100%", marginTop: 2 }}
+                  value={item.echeance ? item.echeance.slice(0, 10) : ""}
+                  onChange={(e) => void run(modifierChecklistItem(item.id, { echeance: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+              </label>
+              <button type="button" className="btn btn-ghost btn-inline" style={{ display: "block", width: "100%", textAlign: "left" }}
+                onClick={() => { setMenu(false); void run(convertirItemEnCarte(item.id)); }}>Convertir en carte</button>
+              <button type="button" className="btn btn-ghost btn-inline" style={{ display: "block", width: "100%", textAlign: "left", color: "var(--danger, #c0392b)" }}
+                onClick={() => { setMenu(false); void run(supprimerChecklistItem(item.id)); }}>Supprimer</button>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
