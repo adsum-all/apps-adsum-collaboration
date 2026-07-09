@@ -24,6 +24,15 @@ export function reordonnerColonnes(tableauId: string, ordre: string[]): Promise<
   return request(`${B}/tableaux/${tableauId}/colonnes/ordre`, { method: "POST", body: jbody({ ordre }) }, "Reordonnancement impossible");
 }
 
+// Live presence: heartbeat while a card is open, returns the other current viewers.
+export interface Presence { utilisateur_id: string; nom: string; initiales: string }
+export function battementPresence(carteId: string): Promise<Presence[]> {
+  return request(`${B}/cartes-espace/${carteId}/presence`, { method: "POST" }, "Presence indisponible");
+}
+export function quitterPresence(carteId: string): Promise<void> {
+  return request(`${B}/cartes-espace/${carteId}/presence`, { method: "DELETE" }, "Presence indisponible");
+}
+
 // Cards
 export function listCartes(tableauId: string): Promise<CarteProto[]> {
   return request(`${B}/tableaux/${tableauId}/cartes`, { method: "GET" }, "Cartes indisponibles");
