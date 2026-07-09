@@ -1,7 +1,9 @@
 // Cards, columns, checklists, comments and reactions: real API calls that mirror
 // the prototype store surface. Endpoints live under /api/v1/collaboration.
-import type { CarteProto, ColonneProto, CommentaireProto } from "./types.js";
+import type { CarteProto, ColonneProto, CommentaireProto, PieceJointe } from "./types.js";
 import { request, jbody } from "./http.js";
+
+export interface PieceInput { nom: string; type: string; taille: number; data_url: string }
 
 const B = "/api/v1/collaboration";
 
@@ -115,5 +117,52 @@ export function reagirCommentaire(carteId: string, commentaireId: string, type: 
     `${B}/commentaires/${commentaireId}/reaction`,
     { method: "POST", body: jbody({ carte_id: carteId, type }) },
     "Reaction impossible",
+  );
+}
+export function modifierCommentaire(commentaireId: string, corps: string): Promise<CommentaireProto> {
+  return request(`${B}/commentaires/${commentaireId}`, { method: "PATCH", body: jbody({ corps }) }, "Modification impossible");
+}
+export function supprimerCommentaire(commentaireId: string): Promise<void> {
+  return request(`${B}/commentaires/${commentaireId}`, { method: "DELETE" }, "Suppression impossible");
+}
+
+// Attachments (cards and comments)
+export function uploadCartePiece(carteId: string, piece: PieceInput): Promise<PieceJointe> {
+  return request(`${B}/cartes-espace/${carteId}/pieces`, { method: "POST", body: jbody(piece) }, "Ajout de piece impossible");
+}
+export function uploadCommentPiece(commentaireId: string, piece: PieceInput): Promise<PieceJointe> {
+  return request(`${B}/commentaires/${commentaireId}/pieces`, { method: "POST", body: jbody(piece) }, "Ajout de piece impossible");
+}
+export function supprimerPiece(pieceId: string): Promise<void> {
+  return request(`${B}/pieces/${pieceId}`, { method: "DELETE" }, "Suppression impossible");
+}
+export function definirCouverture(carteId: string, pieceId: string | null): Promise<void> {
+  return request(`${B}/cartes-espace/${carteId}/couverture`, { method: "POST", body: jbody({ piece_id: pieceId }) }, "Action impossible");
+}
+
+// Checklists and items (advanced)
+export function renommerChecklist(checklistId: string, titre: string): Promise<void> {
+  return request(`${B}/checklists/${checklistId}`, { method: "PATCH", body: jbody({ titre }) }, "Action impossible");
+}
+export function supprimerChecklist(checklistId: string): Promise<void> {
+  return request(`${B}/checklists/${checklistId}`, { method: "DELETE" }, "Suppression impossible");
+}
+export function modifierChecklistItem(
+  itemId: string,
+  patch: { texte?: string; assigne_id?: string | null; echeance?: string | null },
+): Promise<void> {
+  return request(`${B}/checklist-items/${itemId}`, { method: "PATCH", body: jbody(patch) }, "Action impossible");
+}
+export function supprimerChecklistItem(itemId: string): Promise<void> {
+  return request(`${B}/checklist-items/${itemId}`, { method: "DELETE" }, "Suppression impossible");
+}
+export function reordonnerChecklistItems(checklistId: string, ordre: string[]): Promise<void> {
+  return request(`${B}/checklists/${checklistId}/items/ordre`, { method: "POST", body: jbody({ ordre }) }, "Action impossible");
+}
+export function convertirItemEnCarte(itemId: string, colonneId?: string | null): Promise<{ id: string }> {
+  return request(
+    `${B}/checklist-items/${itemId}/convertir`,
+    { method: "POST", body: jbody({ colonne_id: colonneId ?? null }) },
+    "Conversion impossible",
   );
 }

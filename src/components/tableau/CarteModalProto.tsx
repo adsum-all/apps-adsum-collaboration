@@ -4,19 +4,26 @@ import {
   ajouterChecklist,
   ajouterChecklistItem,
   ajouterCommentaire,
+  convertirItemEnCarte,
   deleteCarteProto,
   deplacerCarteVersTableau,
   duplicateCarte,
   listTableauxEspace,
+  modifierChecklistItem,
+  modifierCommentaire,
   publierCarteEnActivite,
   marquerCommentairesLus,
   reagirCommentaire,
+  supprimerChecklist,
+  supprimerChecklistItem,
+  supprimerCommentaire,
   toggleArchiveCarte,
   toggleChecklistItem,
   updateCarteProto,
 } from "../../lib/store.js";
 import { peut, roleDansEspace } from "../../lib/permissions.js";
 import type { CarteProto, Espace, Membre, Priorite, TableauProto } from "../../lib/types.js";
+import { PiecesCarte } from "./PiecesCarte.js";
 
 interface Props {
   carte: CarteProto;
@@ -47,12 +54,14 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   const [publierErr, setPublierErr] = useState<string | null>(null);
   const [publieOk, setPublieOk] = useState(Boolean(carte.publie));
   const inputComRef = useRef<HTMLInputElement | null>(null);
+  const [editCom, setEditCom] = useState<{ id: string; corps: string } | null>(null);
 
   const role = roleDansEspace(espace, moiId);
   const peutEditer = peut(espace, role, "editer_carte");
   const peutCommenter = peut(espace, role, "commenter");
   const peutArchiver = peut(espace, role, "archiver");
   const peutPublier = peut(espace, role, "publier_evenement");
+  const membresEspace = membres.filter((m) => espace.membres.some((em) => em.membre_id === m.id));
 
   useEffect(() => {
     void marquerCommentairesLus(carte.id).then(() => onChanged());
@@ -223,6 +232,12 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                     <div className="checklist-head">
                       <strong>{cl.titre}</strong>
                       <span className="muted small">{faits}/{total} · {pct}%</span>
+                      {peutEditer && (
+                        <button type="button" className="btn btn-ghost btn-inline" style={{ fontSize: 11 }}
+                          onClick={async () => { if (window.confirm(`Supprimer la checklist « ${cl.titre} » ?`)) { await supprimerChecklist(cl.id); await onChanged(); } }}>
+                          Supprimer la checklist
+                        </button>
+                      )}
                     </div>
                     <div className="progress"><div className="progress-bar" style={{ width: `${pct}%` }} /></div>
                     <ul>
@@ -233,6 +248,26 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                               onChange={async () => { await toggleChecklistItem(carte.id, cl.id, it.id); await onChanged(); }} />
                             <span className={it.fait ? "checklist-fait" : ""}>{it.texte}</span>
                           </label>
+                          {peutEditer && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", margin: "2px 0 6px 26px" }}>
+                              <select aria-label="Assigné" value={it.assigne_id ?? ""} style={{ fontSize: 12 }}
+                                onChange={async (e) => { await modifierChecklistItem(it.id, { assigne_id: e.target.value || null }); await onChanged(); }}>
+                                <option value="">Non assigné</option>
+                                {membresEspace.map((m) => (<option key={m.id} value={m.id}>{m.nom}</option>))}
+                              </select>
+                              <input type="date" aria-label="Échéance item" style={{ fontSize: 12 }}
+                                value={it.echeance ? it.echeance.slice(0, 10) : ""}
+                                onChange={async (e) => { await modifierChecklistItem(it.id, { echeance: e.target.value ? new Date(e.target.value).toISOString() : null }); await onChanged(); }} />
+                              <button type="button" className="btn btn-ghost btn-inline" style={{ fontSize: 11 }}
+                                onClick={async () => { await convertirItemEnCarte(it.id); await onChanged(); }} title="Convertir en carte">
+                                Convertir en carte
+                              </button>
+                              <button type="button" className="btn btn-ghost btn-inline" style={{ fontSize: 11 }}
+                                onClick={async () => { await supprimerChecklistItem(it.id); await onChanged(); }}>
+                                Supprimer
+                              </button>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -267,6 +302,8 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                 </div>
               )}
             </div>
+
+            <PiecesCarte carte={carte} peutEditer={peutEditer} onChanged={onChanged} />
 
             {(peutEditer || peutArchiver || peutPublier) && (
               <div className="modal-actions" style={{ flexWrap: "wrap" }}>
@@ -361,21 +398,41 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                 const coches = c.reactions.filter((r) => r.type === "coche").length;
                 const jePouce = c.reactions.some((r) => r.type === "pouce" && r.membre_id === moiId);
                 const jeCoche = c.reactions.some((r) => r.type === "coche" && r.membre_id === moiId);
+                const estAuteur = c.auteur_id === moiId;
                 return (
                   <div key={c.id} className="chat-msg">
                     <span className="chat-author">{nomMembre(c.auteur_id)}</span>
-                    <span className="chat-body">{c.corps}</span>
+                    {editCom?.id === c.id ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "4px 0" }}>
+                        <textarea className="textarea" rows={2} value={editCom.corps}
+                          onChange={(e) => setEditCom({ id: c.id, corps: e.target.value })} />
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button type="button" className="btn btn-primary btn-inline" disabled={!editCom.corps.trim()}
+                            onClick={async () => { await modifierCommentaire(c.id, editCom.corps.trim()); setEditCom(null); await onChanged(); }}>Enregistrer</button>
+                          <button type="button" className="btn btn-ghost btn-inline" onClick={() => setEditCom(null)}>Annuler</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="chat-body">{c.corps}{c.edite_le && <span className="muted small"> (modifié)</span>}</span>
+                    )}
                     <span className="chat-time">{new Date(c.cree_le).toLocaleString("fr-FR")}</span>
-                    {peutCommenter && (
+                    {peutCommenter && editCom?.id !== c.id && (
                       <span className="chat-reactions">
                         <button type="button" className={`react-btn${jePouce ? " react-btn-on" : ""}`}
                           onClick={async () => { await reagirCommentaire(carte.id, c.id, "pouce"); await onChanged(); }}>
-                          👍 {pouces > 0 && pouces}
+                          J&apos;aime{pouces > 0 ? ` ${pouces}` : ""}
                         </button>
                         <button type="button" className={`react-btn${jeCoche ? " react-btn-on" : ""}`}
                           onClick={async () => { await reagirCommentaire(carte.id, c.id, "coche"); await onChanged(); }}>
-                          ✅ {coches > 0 && coches}
+                          Fait{coches > 0 ? ` ${coches}` : ""}
                         </button>
+                        {estAuteur && (
+                          <>
+                            <button type="button" className="react-btn" onClick={() => setEditCom({ id: c.id, corps: c.corps })}>Modifier</button>
+                            <button type="button" className="react-btn"
+                              onClick={async () => { if (window.confirm("Supprimer ce commentaire ?")) { await supprimerCommentaire(c.id); await onChanged(); } }}>Supprimer</button>
+                          </>
+                        )}
                       </span>
                     )}
                   </div>
