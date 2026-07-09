@@ -63,9 +63,12 @@ export function PiecesCarte({ carte, peutEditer, onChanged }: Props): JSX.Elemen
   async function retirer(id: string): Promise<void> {
     if (!window.confirm("Retirer cette pièce jointe ?")) return;
     setBusy(true);
+    setErr(null);
     try {
       await supprimerPiece(id);
       await onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Suppression impossible");
     } finally {
       setBusy(false);
     }
@@ -73,9 +76,12 @@ export function PiecesCarte({ carte, peutEditer, onChanged }: Props): JSX.Elemen
 
   async function couvrir(id: string | null): Promise<void> {
     setBusy(true);
+    setErr(null);
     try {
       await definirCouverture(carte.id, id);
       await onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Action impossible");
     } finally {
       setBusy(false);
     }

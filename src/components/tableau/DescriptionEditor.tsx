@@ -47,8 +47,12 @@ export function DescriptionEditor({ value, membres, disabled, onSave }: Props): 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (editing && ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value || "";
-  }, [editing, value]);
+    // Seed the editable buffer only when entering edit mode, not on every `value`
+    // change: a background reload that updates the card prop must not overwrite an
+    // unsaved in-progress edit. The read view already reflects live `value`.
+    if (editing && ref.current) ref.current.innerHTML = value || "";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   const suggestions = (() => {
     const f = frag.trim().toLowerCase();

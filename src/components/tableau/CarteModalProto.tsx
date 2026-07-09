@@ -57,6 +57,32 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   const inputComRef = useRef<HTMLInputElement | null>(null);
   const [editCom, setEditCom] = useState<{ id: string; corps: string } | null>(null);
   const [viewers, setViewers] = useState<Presence[]>([]);
+  const [assignesLoc, setAssignesLoc] = useState<string[]>(carte.assignes);
+  const [etiquettesLoc, setEtiquettesLoc] = useState<string[]>(carte.etiquettes);
+  const assignesRef = useRef(carte.assignes);
+  const etiquettesRef = useRef(carte.etiquettes);
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  const [errAction, setErrAction] = useState<string | null>(null);
+  useEffect(() => { assignesRef.current = carte.assignes; setAssignesLoc(carte.assignes); }, [carte.assignes]);
+  useEffect(() => { etiquettesRef.current = carte.etiquettes; setEtiquettesLoc(carte.etiquettes); }, [carte.etiquettes]);
+
+  // Serialize relation writes so rapid clicks cannot reorder on the server and each
+  // PATCH carries the cumulative array (fixes the lost-update race on assignees/labels).
+  function enqueueSave(patch: Partial<CarteProto>): void {
+    saveChain.current = saveChain.current
+      .then(() => updateCarteProto(carte.id, patch))
+      .then(() => onChanged())
+      .catch((e) => setErrAction(e instanceof Error ? e.message : "Enregistrement impossible"));
+  }
+
+  async function run(fn: () => Promise<unknown>): Promise<void> {
+    try {
+      await fn();
+      await onChanged();
+    } catch (e) {
+      setErrAction(e instanceof Error ? e.message : "Action impossible");
+    }
+  }
   const [itemDrag, setItemDrag] = useState<{ checklistId: string; itemId: string } | null>(null);
   const [itemOver, setItemOver] = useState<string | null>(null);
 
@@ -124,13 +150,19 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   }
 
   function toggleEtiquette(id: string): void {
-    const has = carte.etiquettes.includes(id);
-    void save({ etiquettes: has ? carte.etiquettes.filter((x) => x !== id) : [...carte.etiquettes, id] });
+    const prev = etiquettesRef.current;
+    const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    etiquettesRef.current = next;
+    setEtiquettesLoc(next);
+    enqueueSave({ etiquettes: next });
   }
 
   function toggleAssigne(id: string): void {
-    const has = carte.assignes.includes(id);
-    void save({ assignes: has ? carte.assignes.filter((x) => x !== id) : [...carte.assignes, id] });
+    const prev = assignesRef.current;
+    const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    assignesRef.current = next;
+    setAssignesLoc(next);
+    enqueueSave({ assignes: next });
   }
 
   function nomMembre(id: string): string {
@@ -158,10 +190,14 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   async function envoyerCom(): Promise<void> {
     const v = nouveauCom.trim();
     if (!v) return;
-    await ajouterCommentaire(carte.id, v);
-    setNouveauCom("");
-    setMentionOpen(false);
-    await onChanged();
+    try {
+      await ajouterCommentaire(carte.id, v);
+      setNouveauCom("");
+      setMentionOpen(false);
+      await onChanged();
+    } catch (e) {
+      setErrAction(e instanceof Error ? e.message : "Envoi impossible");
+    }
   }
 
   return (
@@ -194,6 +230,11 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
           <button type="button" className="btn btn-ghost btn-inline" onClick={onClose} aria-label="Fermer">Fermer</button>
         </div>
 
+        {errAction && (
+          <div role="alert" className="banner banner-warn" style={{ margin: "8px 16px 0" }} onClick={() => setErrAction(null)}>
+            {errAction} (cliquer pour masquer)
+          </div>
+        )}
         <div className="modal-body">
           <div className="modal-form">
             <DescriptionEditor
@@ -229,7 +270,7 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
               <span className="modal-section-titre">Étiquettes</span>
               <div className="et-picker">
                 {espace.etiquettes.map((et) => {
-                  const active = carte.etiquettes.includes(et.id);
+                  const active = etiquettesLoc.includes(et.id);
                   return (
                     <button key={et.id} type="button"
                       className={`et-pill${active ? "" : " et-pill-off"}`}
@@ -246,7 +287,7 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
               <span className="modal-section-titre">Assignés</span>
               <div className="et-picker">
                 {membres.filter((m) => espace.membres.some((em) => em.membre_id === m.id)).map((m) => {
-                  const active = carte.assignes.includes(m.id);
+                  const active = assignesLoc.includes(m.id);
                   return (
                     <button key={m.id} type="button" className={`membre-chip${active ? " membre-chip-on" : ""}`}
                       onClick={() => peutEditer && toggleAssigne(m.id)} disabled={!peutEditer}>
@@ -324,9 +365,7 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
             {(peutEditer || peutArchiver || peutPublier) && (
               <div className="modal-actions" style={{ flexWrap: "wrap" }}>
                 {peutEditer && (
-                  <button type="button" className="btn btn-ghost btn-inline" onClick={async () => {
-                    await duplicateCarte(carte.id); await onChanged();
-                  }}>Dupliquer</button>
+                  <button type="button" className="btn btn-ghost btn-inline" onClick={() => void run(() => duplicateCarte(carte.id))}>Dupliquer</button>
                 )}
                 {peutEditer && (
                   <button type="button" className="btn btn-ghost btn-inline" onClick={() => setShowMove((v) => !v)}>
@@ -341,10 +380,8 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                   </button>
                 )}
                 {peutArchiver && (
-                  <button type="button" className="btn btn-ghost btn-inline" onClick={async () => {
-                    await toggleArchiveCarte(carte.id, !carte.archive);
-                    await onChanged();
-                  }}>{carte.archive ? "Restaurer" : "Archiver"}</button>
+                  <button type="button" className="btn btn-ghost btn-inline"
+                    onClick={() => void run(() => toggleArchiveCarte(carte.id, !carte.archive))}>{carte.archive ? "Restaurer" : "Archiver"}</button>
                 )}
                 {peutArchiver && (
                   <button type="button" className="btn btn-danger" onClick={async () => {
@@ -435,18 +472,18 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
                     {peutCommenter && editCom?.id !== c.id && (
                       <span className="chat-reactions">
                         <button type="button" className={`react-btn${jePouce ? " react-btn-on" : ""}`}
-                          onClick={async () => { await reagirCommentaire(carte.id, c.id, "pouce"); await onChanged(); }}>
+                          onClick={() => void run(() => reagirCommentaire(carte.id, c.id, "pouce"))}>
                           J&apos;aime{pouces > 0 ? ` ${pouces}` : ""}
                         </button>
                         <button type="button" className={`react-btn${jeCoche ? " react-btn-on" : ""}`}
-                          onClick={async () => { await reagirCommentaire(carte.id, c.id, "coche"); await onChanged(); }}>
+                          onClick={() => void run(() => reagirCommentaire(carte.id, c.id, "coche"))}>
                           Fait{coches > 0 ? ` ${coches}` : ""}
                         </button>
                         {estAuteur && (
                           <>
                             <button type="button" className="react-btn" onClick={() => setEditCom({ id: c.id, corps: c.corps })}>Modifier</button>
                             <button type="button" className="react-btn"
-                              onClick={async () => { if (window.confirm("Supprimer ce commentaire ?")) { await supprimerCommentaire(c.id); await onChanged(); } }}>Supprimer</button>
+                              onClick={() => { if (window.confirm("Supprimer ce commentaire ?")) void run(() => supprimerCommentaire(c.id)); }}>Supprimer</button>
                           </>
                         )}
                       </span>
