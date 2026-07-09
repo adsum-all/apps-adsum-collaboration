@@ -5,4 +5,5 @@ reason. Every entry must stay under 750 lines and carry a justification.
 
 | File | Lines | Reason |
 |---|---|---|
-| src/components/tableau/TableauPage.tsx | 727 | Rich board page ported verbatim from the committee collaboration prototype: kanban with pointer drag and drop, inline column editing, WIP limits, the list/table view and the embedded rich card modal. Kept as one screen to match the prototype exactly; scheduled to be split (column, card, header sub-components) in a follow-up once the space backend is wired and behavior is proven. |
+| src/components/tableau/TableauPage.tsx | 700 | Rich board page: kanban with drag and drop of cards and columns, inline column editing, WIP limits, filters, list/table view, near-real-time refresh and the embedded card modal. The card tile was extracted to CarteVue.tsx; the column sub-component (ColonneVue) remains inline and is the next scheduled split. |
+| src/components/tableau/CarteModalProto.tsx | 536 | Full card detail modal (rich description, checklists with multi-assignee, attachments, comments with edit/delete and reactions, labels, dates, publish-as-activity, live presence). Dense but cohesive single screen; further splits (chat, side panel) tracked for a follow-up. |

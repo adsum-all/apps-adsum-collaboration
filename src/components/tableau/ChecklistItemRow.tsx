@@ -86,7 +86,7 @@ export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEdit
             {membres.map((m) => {
               const on = assignes.includes(m.id);
               return (
-                <button key={m.id} type="button" className="mention-item" onClick={() => toggleAssigne(m.id)}
+                <button key={m.id} type="button" className="mention-item" disabled={busy} onClick={() => toggleAssigne(m.id)}
                   style={on ? { fontWeight: 600 } : undefined}>
                   <span className="avatar avatar-sm">{m.initiales}</span>
                   <span>{m.nom}</span>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createCarteProto,
@@ -18,6 +18,7 @@ import {
 import { peut, roleDansEspace } from "../../lib/permissions.js";
 import type { CarteProto, ColonneProto, Espace, Membre, TableauProto } from "../../lib/types.js";
 import { CarteModalProto } from "./CarteModalProto.js";
+import { CarteVue, echeanceLate, formatDate, libellePriorite } from "./CarteVue.js";
 
 type Vue = "kanban" | "liste";
 
@@ -46,6 +47,7 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
   const [dragOver, setDragOver] = useState<{ colonneId: string; index: number } | null>(null);
   const [colDrag, setColDrag] = useState<string | null>(null);
   const [colOver, setColOver] = useState<string | null>(null);
+  const [erreurBoard, setErreurBoard] = useState<string | null>(null);
   const [fRecherche, setFRecherche] = useState("");
   const [fPriorite, setFPriorite] = useState<string>("");
   const [fEtiquette, setFEtiquette] = useState<string>("");
@@ -73,13 +75,18 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
 
   const filtresActifs = Boolean(fRecherche || fPriorite || fEtiquette || fAssigne || fRetard);
 
+  const reloadSeq = useRef(0);
   const reload = useCallback(async () => {
+    const seq = ++reloadSeq.current;
     const [t, c, k, ka] = await Promise.all([
       getTableauProto(tableauId),
       listColonnes(tableauId),
       listCartes(tableauId),
       listCartesArchivees(tableauId),
     ]);
+    // Drop a stale reload whose response arrives after a newer one was issued, so an
+    // earlier-but-slower fetch cannot overwrite fresher data (last-write-wins bug).
+    if (seq !== reloadSeq.current) return;
     setTableau(t);
     setColonnes(c);
     setCartes(k);
@@ -94,8 +101,13 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
     const ids = colonnes.map((c) => c.id).filter((id) => id !== dragged);
     const at = ids.indexOf(targetColId);
     ids.splice(at < 0 ? ids.length : at, 0, dragged);
-    await reordonnerColonnes(tableauId, ids);
-    await reload();
+    try {
+      await reordonnerColonnes(tableauId, ids);
+    } catch (e) {
+      setErreurBoard(e instanceof Error ? e.message : "Reordonnancement impossible");
+    } finally {
+      await reload();
+    }
   }
 
   useEffect(() => {
@@ -107,14 +119,20 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
   // regains focus, and poll gently while the board is visible and no card is open
   // (polling is paused during a card edit so it never clobbers an in-progress change).
   useEffect(() => {
-    const onFocus = (): void => { if (document.visibilityState === "visible") void reload(); };
+    const onFocus = (): void => {
+      if (document.visibilityState !== "visible") return;
+      // Do not refetch while a card is open or a drag is in progress: it would
+      // clobber an unsaved card edit or yank the board mid-drag.
+      if (openCardId || drag || colDrag) return;
+      void reload();
+    };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [reload]);
+  }, [reload, openCardId, drag, colDrag]);
 
   useEffect(() => {
     if (openCardId) return undefined;
@@ -164,14 +182,26 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
 
   async function drop(colonneId: string, index: number): Promise<void> {
     if (!drag) return;
-    await moveCarte(drag.carteId, colonneId, index);
+    const carteId = drag.carteId;
     setDrag(null);
     setDragOver(null);
-    await reload();
+    try {
+      await moveCarte(carteId, colonneId, index);
+    } catch (e) {
+      setErreurBoard(e instanceof Error ? e.message : "Déplacement impossible");
+    } finally {
+      await reload();
+    }
   }
 
   return (
     <div className="page page-wide">
+      {erreurBoard && (
+        <div role="alert" className="banner banner-warn" style={{ margin: "0 0 8px" }}
+          onClick={() => setErreurBoard(null)}>
+          {erreurBoard} (cliquer pour masquer)
+        </div>
+      )}
       <header className="page-head tab-head">
         <div>
           <button type="button" className="btn btn-ghost btn-inline" onClick={onRetour}>
@@ -315,6 +345,7 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
               draggingCol={colDrag != null}
               colSurvole={colOver === col.id && colDrag != null && colDrag !== col.id}
               onColDragStart={() => setColDrag(col.id)}
+              onColDragEnd={() => { setColDrag(null); setColOver(null); }}
               onColDragOver={() => setColOver(col.id)}
               onColDrop={() => void reorderColonne(col.id)}
               onOpen={setOpenCardId}
@@ -400,6 +431,7 @@ interface ColonneVueProps {
   draggingCol: boolean;
   colSurvole: boolean;
   onColDragStart: () => void;
+  onColDragEnd: () => void;
   onColDragOver: () => void;
   onColDrop: () => void;
 }
@@ -427,6 +459,7 @@ function ColonneVue({
   draggingCol,
   colSurvole,
   onColDragStart,
+  onColDragEnd,
   onColDragOver,
   onColDrop,
 }: ColonneVueProps): JSX.Element {
@@ -462,7 +495,7 @@ function ColonneVue({
       {colonne.couleur && <div className="kanban-col-bar" style={{ background: colonne.couleur }} aria-hidden="true" />}
       <header className="kanban-col-head">
         {peutGererCol && !editNom && (
-          <span draggable title="Deplacer la colonne" onDragStart={onColDragStart}
+          <span draggable title="Deplacer la colonne" onDragStart={onColDragStart} onDragEnd={onColDragEnd}
             style={{ cursor: "grab", color: "var(--muted, #9aa4b2)", userSelect: "none", paddingRight: 2 }}>≡</span>
         )}
 
@@ -545,6 +578,7 @@ function ColonneVue({
             onDrop={(e) => {
               if (!peutDeplacer || !draggingId) return;
               e.preventDefault();
+              e.stopPropagation();  // never let a card drop bubble to the column-reorder drop
               onDrop(dragOver ?? cartes.length);
             }}
           >
@@ -593,127 +627,6 @@ function ColonneVue({
 
     </section>
   );
-}
-
-interface CarteVueProps {
-  carte: CarteProto;
-  espace: Espace;
-  membres: Membre[];
-  draggable: boolean;
-  isDragging: boolean;
-  dropBefore: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDragOverIndex: (pos: "before" | "after") => void;
-  onOpen: () => void;
-}
-
-function CarteVue({
-  carte,
-  espace,
-  membres,
-  draggable,
-  isDragging,
-  dropBefore,
-  onDragStart,
-  onDragEnd,
-  onDragOverIndex,
-  onOpen,
-}: CarteVueProps): JSX.Element {
-  const etiquettes = espace.etiquettes.filter((e) => carte.etiquettes.includes(e.id));
-  const assignes = membres.filter((m) => carte.assignes.includes(m.id));
-  const checklistsTotal = carte.checklists.reduce((s, cl) => s + cl.items.length, 0);
-  const checklistsFait = carte.checklists.reduce((s, cl) => s + cl.items.filter((i) => i.fait).length, 0);
-
-  return (
-    <>
-      {dropBefore && <div className="kanban-drop-zone kanban-drop-zone-over">Déposer ici</div>}
-      <article
-        className={`kanban-card${isDragging ? " kanban-card-dragging" : ""}`}
-        draggable={draggable}
-        onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", carte.id);
-          onDragStart();
-        }}
-        onDragEnd={onDragEnd}
-        onDragOver={(e) => {
-          e.preventDefault();
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          const before = e.clientY - rect.top < rect.height / 2;
-          onDragOverIndex(before ? "before" : "after");
-        }}
-      >
-        {etiquettes.length > 0 && (
-          <div className="kanban-card-etiq">
-            {etiquettes.map((et) => (
-              <span key={et.id} className="et-pill" style={{ background: et.couleur }} title={et.nom}>
-                {et.nom}
-              </span>
-            ))}
-          </div>
-        )}
-        <button type="button" className="kanban-card-main" onClick={onOpen}>
-          <span className="kanban-card-title">{carte.titre}</span>
-          <span className="kanban-card-meta">
-            <span className="muted small">#{carte.numero}</span>
-            {carte.priorite !== "normale" && (
-              <span className={`badge badge-prio badge-prio-${carte.priorite}`}>
-                {libellePriorite(carte.priorite)}
-              </span>
-            )}
-            {carte.echeance && (
-              <span className={`badge ${echeanceLate(carte.echeance) ? "badge-warn" : "badge-mut"}`}>
-                {formatDate(carte.echeance)}
-              </span>
-            )}
-            {checklistsTotal > 0 && (
-              <span className="badge badge-mut">
-                {checklistsFait}/{checklistsTotal}
-              </span>
-            )}
-            {carte.commentaires.length > 0 && (
-              <span className="badge badge-mut" aria-label="commentaires">
-                {carte.commentaires.length} 💬
-              </span>
-            )}
-          </span>
-          {assignes.length > 0 && (
-            <span className="kanban-card-avatars">
-              {assignes.map((a) => (
-                <span key={a.id} className="avatar avatar-sm" title={a.nom} aria-hidden="true">
-                  {a.initiales}
-                </span>
-              ))}
-            </span>
-          )}
-        </button>
-      </article>
-    </>
-  );
-}
-
-function libellePriorite(p: string): string {
-  switch (p) {
-    case "urgente":
-      return "Urgente";
-    case "haute":
-      return "Haute";
-    case "basse":
-      return "Basse";
-    default:
-      return "Normale";
-  }
-}
-
-function echeanceLate(iso: string): boolean {
-  return new Date(iso).getTime() < Date.now();
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 }
 
 interface ListeVueProps {
