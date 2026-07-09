@@ -9,6 +9,7 @@ import {
 import { detectPlatform } from "../../lib/platform.js";
 import { ActiviteFormComplet } from "./ActiviteFormComplet.js";
 import { PiecesEvenement } from "./PiecesEvenement.js";
+import { SerieOccurrences } from "./SerieOccurrences.js";
 
 interface Props {
   activiteId: string;
@@ -133,6 +134,17 @@ export function ActiviteDrawer({ activiteId, onClose, onChanged }: Props): JSX.E
               <div style={{ borderTop: "1px solid var(--border, #e2e2e2)", paddingTop: 12 }}>
                 <PiecesEvenement activiteId={activiteId} peutGerer={peutGerer && !d.annule} />
               </div>
+
+              {peutGerer && !d.annule && (
+                <SerieOccurrences
+                  activiteId={activiteId}
+                  debut={d.debut}
+                  fin={d.fin}
+                  zone={d.fuseau_horaire}
+                  estSerie={Boolean(d.serie_id)}
+                  onChanged={() => { charger(); onChanged(); }}
+                />
+              )}
 
               {peutGerer && !d.annule && (
                 <div style={{ borderTop: "1px solid var(--border, #e2e2e2)", paddingTop: 12, display: "flex", gap: 8 }}>

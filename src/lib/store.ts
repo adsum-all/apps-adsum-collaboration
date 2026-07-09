@@ -264,6 +264,12 @@ export function supprimerPieceActivite(pieceId: string): Promise<void> {
   return request(`${B}/activites/pieces/${pieceId}`, { method: "DELETE" }, "Suppression impossible");
 }
 
+// Additively append dates to an activity's series (a one-off becomes a series on
+// the first append). Same shared engine as the back office.
+export function ajouterOccurrences(id: string, occurrences: { debut: string; fin?: string }[]): Promise<{ ajoutees: number; total: number }> {
+  return request(`${B}/activites/${id}/occurrences`, { method: "POST", body: jbody({ occurrences }) }, "Ajout des dates impossible");
+}
+
 // The signed-in account's platform permissions, cached, so the UI knows whether it
 // may create/edit activities (collaboration.gerer) rather than guessing from a role.
 let _permissions: string[] | null = null;
