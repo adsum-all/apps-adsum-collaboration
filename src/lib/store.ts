@@ -178,6 +178,9 @@ export interface EvenementPayload {
   fenetre_reponse_heures?: number | null;
   fuseau_horaire?: string;
   occurrences?: { debut: string; fin?: string | null; mode?: string | null }[];
+  description?: string | null;
+  intervenant_principal?: string | null;
+  intervenants?: string[];
 }
 
 export function creerActivite(input: EvenementPayload): Promise<{ id: string }> {
@@ -209,6 +212,11 @@ export interface EvenementDetail {
   fuseau_horaire: string;
   serie_id: string | null;
   annule: boolean;
+  description: string | null;
+  intervenant_principal: string | null;
+  intervenants: string[];
+  cible_libelle?: string | null;
+  tags?: { id: string; cle: string; libelle: string }[];
 }
 export function detailActivite(id: string): Promise<EvenementDetail> {
   return request(`${B}/activites/${id}`, { method: "GET" }, "Activité indisponible");

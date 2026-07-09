@@ -8,15 +8,16 @@ import {
   listCibles,
   modifierActivite,
 } from "../../lib/store.js";
+import { detectPlatform } from "../../lib/platform.js";
+import { RichEditor } from "../common/RichEditor.js";
 
 // The full activity/event form, reproduced from the back office so an activity can
-// be programmed or edited from collaboration with EXACTLY the same fields (title,
-// zone, start/end, place, type, mode, diffusion, visibility, volet, response
-// window, full targeting and recurrence). It reaches the same shared engine, so the
-// activity behaves identically wherever it was created.
+// be programmed or edited from collaboration with EXACTLY the same fields, plus a
+// rich description, contributors and automatic broadcast-source detection. Aired,
+// single-column and scrollable for real usability. Reaches the same shared engine.
 
 const FUSEAUX: [string, string][] = [
-  ["Africa/Abidjan", "Abidjan (GMT+0)"],
+  ["Africa/Abidjan", "Côte d'Ivoire (GMT)"],
   ["Africa/Lagos", "Lagos (GMT+1)"],
   ["Europe/Paris", "Paris (GMT+1/+2)"],
   ["Europe/London", "Londres (GMT+0/+1)"],
@@ -42,6 +43,16 @@ function isoToLocal(iso: string | null): string {
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number): string => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function Champ({ label, aide, children, full }: { label: string; aide?: string; children: JSX.Element; full?: boolean }): JSX.Element {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: full ? "1 / -1" : "auto" }}>
+      <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+      {children}
+      {aide && <span className="muted" style={{ fontSize: 12 }}>{aide}</span>}
+    </label>
+  );
 }
 
 interface Props {
@@ -71,8 +82,14 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
   const [liens, setLiens] = useState<string[]>(
     detail?.liens && detail.liens.length > 0 ? detail.liens : detail?.lien_session ? [detail.lien_session] : [""],
   );
-  const [repeter, setRepeter] = useState("0"); // extra weekly occurrences (create only)
+  const [repetition, setRepetition] = useState<"aucune" | "hebdomadaire" | "quotidienne">("aucune");
+  const [nbRepet, setNbRepet] = useState("4");
   const [toucherSerie, setToucherSerie] = useState(false);
+  const [principal, setPrincipal] = useState(detail?.intervenant_principal ?? "");
+  const [intervenants, setIntervenants] = useState<string[]>(
+    detail?.intervenants && detail.intervenants.length > 0 ? detail.intervenants : [""],
+  );
+  const [description, setDescription] = useState(detail?.description ?? "");
   const [cibles, setCibles] = useState<Cibles | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +141,9 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
       cible_emails: emails,
       fenetre_reponse_heures: fenetre ? Number(fenetre) : null,
       fuseau_horaire: zone,
+      description: description.trim() || null,
+      intervenant_principal: principal.trim() || null,
+      intervenants: intervenants.map((x) => x.trim()).filter(Boolean),
     };
     if (fin) payload.fin = new Date(fin).toISOString();
     if (lieu.trim()) payload.lieu = lieu.trim();
@@ -131,16 +151,16 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
       payload.liens = cleanLiens;
       payload.lien_session = cleanLiens[0];
     }
-    // Recurrence (create only): repeat weekly N extra times.
-    const n = Number(repeter) || 0;
-    if (!estEdition && n > 0) {
+    // Recurrence (create only): repeat weekly or daily N extra times.
+    const n = Number(nbRepet) || 0;
+    if (!estEdition && repetition !== "aucune" && n > 0) {
+      const stepMs = (repetition === "hebdomadaire" ? 7 : 1) * 24 * 3600 * 1000;
+      const base = new Date(debutIso).getTime();
+      const baseFin = fin ? new Date(new Date(fin).toISOString()).getTime() : null;
       const occs = [];
-      const base = new Date(debutIso);
-      const baseFin = fin ? new Date(new Date(fin).toISOString()) : null;
       for (let i = 1; i <= Math.min(n, 51); i++) {
-        const dd = new Date(base.getTime() + i * 7 * 24 * 3600 * 1000);
-        const occ: { debut: string; fin?: string | null } = { debut: dd.toISOString() };
-        if (baseFin) occ.fin = new Date(baseFin.getTime() + i * 7 * 24 * 3600 * 1000).toISOString();
+        const occ: { debut: string; fin?: string | null } = { debut: new Date(base + i * stepMs).toISOString() };
+        if (baseFin) occ.fin = new Date(baseFin + i * stepMs).toISOString();
         occs.push(occ);
       }
       payload.occurrences = occs;
@@ -161,129 +181,130 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
     }
   }
 
+  const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {error && <p className="small" style={{ color: "var(--danger, #c0392b)" }}>{error}</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <label style={{ gridColumn: "1 / -1" }}>
-          <span className="muted small">Titre *</span>
-          <input value={titre} onChange={(e) => setTitre(e.target.value)} />
-        </label>
-        <label>
-          <span className="muted small">Fuseau horaire</span>
-          <select value={zone} onChange={(e) => setZone(e.target.value)}>
-            {FUSEAUX.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Type</span>
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="rassemblement">Rassemblement</option>
-            <option value="formation">Formation</option>
-            <option value="priere">Prière</option>
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Début *</span>
+
+      <Champ label="Titre *" full>
+        <input value={titre} onChange={(e) => setTitre(e.target.value)} style={{ fontSize: 15, padding: "8px 10px" }} />
+      </Champ>
+
+      <section style={grid}>
+        <Champ label="Fuseau horaire de l'activité *" aide="Par défaut GMT (Côte d'Ivoire). Les heures sont saisies dans ce fuseau ; chaque membre les verra à sa propre heure.">
+          <select value={zone} onChange={(e) => setZone(e.target.value)}>{FUSEAUX.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        </Champ>
+        <Champ label="Début * (heure du fuseau ci-dessus)">
           <input type="datetime-local" value={debut} onChange={(e) => setDebut(e.target.value)} />
-        </label>
-        <label>
-          <span className="muted small">Fin</span>
+        </Champ>
+        <Champ label="Fin">
           <input type="datetime-local" value={fin} onChange={(e) => setFin(e.target.value)} />
-        </label>
-        <label>
-          <span className="muted small">Lieu</span>
-          <input value={lieu} onChange={(e) => setLieu(e.target.value)} />
-        </label>
-        <label>
-          <span className="muted small">Mode</span>
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="presentiel">Présentiel</option>
-            <option value="en_ligne">En ligne</option>
-            <option value="hybride">Hybride</option>
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Diffusion</span>
-          <select value={diffusion} onChange={(e) => setDiffusion(e.target.value)}>
-            <option value="aucun">Aucune</option>
-            <option value="embed">Diffusion intégrée (embed)</option>
-            <option value="externe">Lien externe</option>
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Visibilité</span>
-          <select value={visibilite} onChange={(e) => setVisibilite(e.target.value)}>
-            <option value="public">Public</option>
-            <option value="membres">Membres</option>
-            <option value="prive">Privé</option>
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Volet</span>
-          <select value={volet} onChange={(e) => setVolet(e.target.value)}>
-            <option value="A">A (membres)</option>
-            <option value="B">B (grand public)</option>
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Fenêtre de réponse (h après la fin)</span>
+        </Champ>
+        {!estEdition && (
+          <Champ label="Répétition">
+            <select value={repetition} onChange={(e) => setRepetition(e.target.value as typeof repetition)}>
+              <option value="aucune">Aucune (activité unique)</option>
+              <option value="hebdomadaire">Chaque semaine</option>
+              <option value="quotidienne">Chaque jour</option>
+            </select>
+          </Champ>
+        )}
+        {!estEdition && repetition !== "aucune" && (
+          <Champ label="Nombre de répétitions">
+            <input type="number" min={1} max={51} value={nbRepet} onChange={(e) => setNbRepet(e.target.value)} />
+          </Champ>
+        )}
+        <Champ label="Fenêtre de réponse (h après la fin)" aide="Durée pendant laquelle le questionnaire reste ouvert. Vide = réglage global.">
           <input type="number" min={1} max={336} placeholder="Réglage global" value={fenetre} onChange={(e) => setFenetre(e.target.value)} />
-        </label>
-        <label style={{ gridColumn: "1 / -1" }}>
-          <span className="muted small">Destinataires</span>
+        </Champ>
+        <Champ label="Volet">
+          <select value={volet} onChange={(e) => setVolet(e.target.value)}><option value="A">A (membres)</option><option value="B">B (grand public)</option></select>
+        </Champ>
+        <Champ label="Type">
+          <select value={type} onChange={(e) => setType(e.target.value)}><option value="rassemblement">Rassemblement</option><option value="formation">Formation</option><option value="priere">Prière</option></select>
+        </Champ>
+        <Champ label="Mode">
+          <select value={mode} onChange={(e) => setMode(e.target.value)}><option value="presentiel">Présentiel</option><option value="en_ligne">En ligne</option><option value="hybride">Hybride</option></select>
+        </Champ>
+      </section>
+
+      <section style={grid}>
+        <Champ label="Destinataires (qui est concerné ?)" full>
           <select value={cibleType} onChange={(e) => { setCibleType(e.target.value); setCibleId(null); }}>
             {Object.keys(CIBLE_LABELS).map((k) => <option key={k} value={k}>{CIBLE_LABELS[k]}</option>)}
           </select>
-        </label>
+        </Champ>
         {CIBLE_UNITES.includes(cibleType) && (
-          <label>
-            <span className="muted small">Unité ciblée *</span>
+          <Champ label="Unité ciblée *">
             <select value={cibleId ?? ""} onChange={(e) => setCibleId(e.target.value || null)}>
               <option value="">Choisir...</option>
               {options.map((u) => <option key={u.id} value={u.id}>{u.nom}</option>)}
             </select>
-          </label>
+          </Champ>
         )}
         {cibleType === "liste" && (
-          <label style={{ gridColumn: "1 / -1" }}>
-            <span className="muted small">Adresses e-mail * (une par ligne)</span>
-            <textarea value={emailsTexte} onChange={(e) => setEmailsTexte(e.target.value)} rows={2} />
-          </label>
+          <Champ label="Adresses e-mail * (une par ligne)" full>
+            <textarea value={emailsTexte} onChange={(e) => setEmailsTexte(e.target.value)} rows={3} />
+          </Champ>
         )}
-        <label>
-          <span className="muted small">Affiner par genre</span>
-          <select value={cibleGenre} onChange={(e) => setCibleGenre(e.target.value)}>
-            <option value="">Tous</option>
-            <option value="homme">Hommes</option>
-            <option value="femme">Femmes</option>
-          </select>
-        </label>
-        <label>
-          <span className="muted small">Âge min.</span>
-          <input type="number" min={0} max={120} value={ageMin} onChange={(e) => setAgeMin(e.target.value)} />
-        </label>
-        <label>
-          <span className="muted small">Âge max.</span>
-          <input type="number" min={0} max={120} value={ageMax} onChange={(e) => setAgeMax(e.target.value)} />
-        </label>
-        {!estEdition && (
-          <label>
-            <span className="muted small">Répéter chaque semaine (x fois)</span>
-            <input type="number" min={0} max={51} value={repeter} onChange={(e) => setRepeter(e.target.value)} />
-          </label>
-        )}
-        <div style={{ gridColumn: "1 / -1" }}>
-          <span className="muted small">Liens de diffusion / accès</span>
-          {liens.map((l, i) => (
-            <div key={i} style={{ display: "flex", gap: 6, marginTop: 4 }}>
-              <input style={{ flex: 1 }} value={l} placeholder="https://..." onChange={(e) => setLiens(liens.map((x, j) => (j === i ? e.target.value : x)))} />
-              <button type="button" className="btn btn-ghost btn-inline" onClick={() => setLiens(liens.length > 1 ? liens.filter((_, j) => j !== i) : [""])}>−</button>
+        <Champ label="Affiner par genre">
+          <select value={cibleGenre} onChange={(e) => setCibleGenre(e.target.value)}><option value="">Tous</option><option value="homme">Hommes</option><option value="femme">Femmes</option></select>
+        </Champ>
+        <Champ label="Âge min."><input type="number" min={0} max={120} value={ageMin} onChange={(e) => setAgeMin(e.target.value)} /></Champ>
+        <Champ label="Âge max."><input type="number" min={0} max={120} value={ageMax} onChange={(e) => setAgeMax(e.target.value)} /></Champ>
+        <Champ label="Diffusion">
+          <select value={diffusion} onChange={(e) => setDiffusion(e.target.value)}><option value="aucun">Aucune</option><option value="embed">Diffusion intégrée (embed)</option><option value="externe">Lien externe</option></select>
+        </Champ>
+        <Champ label="Visibilité">
+          <select value={visibilite} onChange={(e) => setVisibilite(e.target.value)}><option value="public">Public</option><option value="membres">Membres</option><option value="prive">Privé</option></select>
+        </Champ>
+        <Champ label="Lieu" full><input value={lieu} onChange={(e) => setLieu(e.target.value)} /></Champ>
+      </section>
+
+      <section style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Liens de diffusion (Zoom, Telegram, YouTube...)</span>
+        <span className="muted" style={{ fontSize: 12 }}>La plateforme est détectée automatiquement.</span>
+        {liens.map((l, i) => {
+          const p = l.trim() ? detectPlatform(l.trim()) : null;
+          return (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input style={{ flex: 1 }} value={l} placeholder="https://..." onChange={(e) => setLiens(liens.map((x, j) => (j === i ? e.target.value : x)))} />
+                <button type="button" className="btn btn-ghost btn-inline" onClick={() => setLiens(liens.length > 1 ? liens.filter((_, j) => j !== i) : [""])}>Retirer</button>
+              </div>
+              {p && (
+                <span style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, color: "#fff", background: p.color }}>
+                  {p.label}
+                </span>
+              )}
+            </div>
+          );
+        })}
+        <div><button type="button" className="btn btn-ghost btn-inline" onClick={() => setLiens([...liens, ""])}>+ Ajouter un lien</button></div>
+      </section>
+
+      <section style={grid}>
+        <Champ label="Intervenant principal (orateur)" full>
+          <input value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="Nom de l'intervenant principal" />
+        </Champ>
+        <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Autres intervenants</span>
+          {intervenants.map((v, i) => (
+            <div key={i} style={{ display: "flex", gap: 6 }}>
+              <input style={{ flex: 1 }} value={v} placeholder="Nom d'un intervenant" onChange={(e) => setIntervenants(intervenants.map((x, j) => (j === i ? e.target.value : x)))} />
+              <button type="button" className="btn btn-ghost btn-inline" onClick={() => setIntervenants(intervenants.length > 1 ? intervenants.filter((_, j) => j !== i) : [""])}>Retirer</button>
             </div>
           ))}
-          <button type="button" className="btn btn-ghost btn-inline" style={{ marginTop: 4 }} onClick={() => setLiens([...liens, ""])}>+ Ajouter un lien</button>
+          <div><button type="button" className="btn btn-ghost btn-inline" onClick={() => setIntervenants([...intervenants, ""])}>+ Ajouter un intervenant</button></div>
         </div>
-      </div>
+      </section>
+
+      <section style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Description</span>
+        <span className="muted" style={{ fontSize: 12 }}>Rédigez le contenu de l'activité : paragraphes, titres, gras, listes, liens.</span>
+        <RichEditor value={description} onChange={setDescription} disabled={busy} />
+      </section>
 
       {estSerie && (
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
@@ -292,7 +313,7 @@ export function ActiviteFormComplet({ detail, onDone, onCancel }: Props): JSX.El
         </label>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+      <div style={{ display: "flex", gap: 8, position: "sticky", bottom: 0, background: "var(--bg, #fff)", paddingTop: 8 }}>
         <button type="button" className="btn btn-primary" disabled={busy || !titre.trim()} onClick={() => void save()}>
           {busy ? "Enregistrement..." : estEdition ? (toucherSerie ? "Enregistrer pour toute la série" : "Enregistrer") : "Créer l'activité"}
         </button>

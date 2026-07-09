@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { type ActivitePubliee, listActivitesPubliees, listCartesAvecEcheance, listEspaces, peutGererActivites } from "../../lib/store.js";
 import type { CarteProto, Espace, Priorite } from "../../lib/types.js";
 import { EmptyState } from "../common/EmptyState.js";
-import { ActiviteModal } from "./ActiviteModal.js";
+import { ActiviteDrawer } from "./ActiviteDrawer.js";
 import { ActiviteFormComplet } from "./ActiviteFormComplet.js";
 
 type CarteCal = CarteProto & { espace_id: string | null };
@@ -210,7 +210,7 @@ export function CalendrierPage({ scopeEspaceId = null, onOuvrirCarte }: Props): 
       </div>
 
       {activiteOuverte && (
-        <ActiviteModal
+        <ActiviteDrawer
           activiteId={activiteOuverte}
           onClose={() => setActiviteOuverte(null)}
           onChanged={rechargerActivites}
