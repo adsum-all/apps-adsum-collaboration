@@ -44,25 +44,25 @@ export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEdit
   const assignesMembres = membres.filter((m) => assignes.includes(m.id));
 
   return (
-    <li style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "3px 0" }}>
-      <label className="switch-row" style={{ flex: 1, alignItems: "flex-start" }}>
+    <li style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "3px 0", flexWrap: "wrap" }}>
+      <label className="switch-row" style={{ flex: "1 1 60%", minWidth: 0, alignItems: "flex-start" }}>
         <input type="checkbox" checked={item.fait} disabled={!peutEditer || busy}
           onChange={() => void run(toggleChecklistItem(carteId, checklistId, item.id))} />
         <span className={item.fait ? "checklist-fait" : ""}>{item.texte}</span>
       </label>
 
       {/* Assignee avatars ("petits bonhommes") */}
-      <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", position: "relative", zIndex: picker ? 40 : undefined }}>
         {assignesMembres.slice(0, 3).map((m) => (
           <span key={m.id} className="avatar avatar-sm" title={m.nom}
             style={{ marginLeft: -6, border: "2px solid var(--surface, #fff)" }}>{m.initiales}</span>
         ))}
         {assignesMembres.length > 3 && <span className="muted small" style={{ marginLeft: 2 }}>+{assignesMembres.length - 3}</span>}
         {peutEditer && (
-          <button type="button" className="btn btn-ghost btn-inline" title="Assigner" disabled={busy}
+          <button type="button" className="btn btn-ghost btn-inline" title="Assigner des personnes" disabled={busy}
             style={{ marginLeft: 4, padding: "0 6px", fontSize: 13, lineHeight: "20px" }}
             onClick={() => { setPicker((v) => !v); setMenu(false); }}>
-            {assignesMembres.length === 0 ? "+ qui ?" : "..."}
+            {assignesMembres.length === 0 ? "+ qui ?" : "+"}
           </button>
         )}
         {picker && (
@@ -85,7 +85,7 @@ export function ChecklistItemRow({ item, carteId, checklistId, membres, peutEdit
 
       {/* Overflow "..." menu: due date, convert, delete */}
       {peutEditer && (
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", zIndex: menu ? 40 : undefined }}>
           <button type="button" className="btn btn-ghost btn-inline" title="Actions" disabled={busy}
             style={{ padding: "0 8px", fontSize: 16, lineHeight: "20px" }}
             onClick={() => { setMenu((v) => !v); setPicker(false); }}>...</button>
