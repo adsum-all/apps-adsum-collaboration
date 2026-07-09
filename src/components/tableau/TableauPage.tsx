@@ -88,6 +88,27 @@ export function TableauPage({ espace, moiId, tableauId, carteInitiale = null, on
     void listMembres().then(setMembres);
   }, [reload]);
 
+  // Near-real-time collaboration without a websocket stack: refetch when the tab
+  // regains focus, and poll gently while the board is visible and no card is open
+  // (polling is paused during a card edit so it never clobbers an in-progress change).
+  useEffect(() => {
+    const onFocus = (): void => { if (document.visibilityState === "visible") void reload(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [reload]);
+
+  useEffect(() => {
+    if (openCardId) return undefined;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !drag) void reload();
+    }, 20000);
+    return () => window.clearInterval(id);
+  }, [reload, openCardId, drag]);
+
   useEffect(() => {
     if (carteInitiale) setOpenCardId(carteInitiale);
   }, [carteInitiale]);
