@@ -4,6 +4,7 @@ import {
   ajouterChecklist,
   ajouterChecklistItem,
   ajouterCommentaire,
+  battementPresence,
   deleteCarteProto,
   deplacerCarteVersTableau,
   duplicateCarte,
@@ -11,6 +12,7 @@ import {
   modifierCommentaire,
   publierCarteEnActivite,
   marquerCommentairesLus,
+  quitterPresence,
   reagirCommentaire,
   reordonnerChecklistItems,
   supprimerChecklist,
@@ -18,6 +20,7 @@ import {
   toggleArchiveCarte,
   updateCarteProto,
 } from "../../lib/store.js";
+import type { Presence } from "../../lib/store.js";
 import { peut, roleDansEspace } from "../../lib/permissions.js";
 import type { CarteProto, Espace, Membre, Priorite, TableauProto } from "../../lib/types.js";
 import { PiecesCarte } from "./PiecesCarte.js";
@@ -53,6 +56,7 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   const [publieOk, setPublieOk] = useState(Boolean(carte.publie));
   const inputComRef = useRef<HTMLInputElement | null>(null);
   const [editCom, setEditCom] = useState<{ id: string; corps: string } | null>(null);
+  const [viewers, setViewers] = useState<Presence[]>([]);
   const [itemDrag, setItemDrag] = useState<{ checklistId: string; itemId: string } | null>(null);
   const [itemOver, setItemOver] = useState<string | null>(null);
 
@@ -80,6 +84,22 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
   useEffect(() => {
     void marquerCommentairesLus(carte.id).then(() => onChanged());
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carte.id]);
+
+  // Live presence: heartbeat while the card is open, show the other current viewers,
+  // and clear our presence when the card closes.
+  useEffect(() => {
+    let alive = true;
+    const beat = (): void => {
+      void battementPresence(carte.id).then((v) => { if (alive) setViewers(v); }).catch(() => undefined);
+    };
+    beat();
+    const id = window.setInterval(beat, 15000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+      void quitterPresence(carte.id).catch(() => undefined);
+    };
   }, [carte.id]);
 
   useEffect(() => {
@@ -162,6 +182,15 @@ export function CarteModalProto({ carte, espace, membres, moiId, onClose, onChan
               <h2>{titre}</h2>
             )}
           </div>
+          {viewers.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", marginRight: 10 }} title={`En train de regarder : ${viewers.map((v) => v.nom).join(", ")}`}>
+              {viewers.slice(0, 4).map((v) => (
+                <span key={v.utilisateur_id} className="avatar avatar-sm"
+                  style={{ marginLeft: -6, border: "2px solid var(--adsum-bg, #fff)", background: "var(--adsum-acc, #2A4FAD)", color: "#fff" }}>{v.initiales}</span>
+              ))}
+              {viewers.length > 4 && <span className="muted small" style={{ marginLeft: 3 }}>+{viewers.length - 4}</span>}
+            </div>
+          )}
           <button type="button" className="btn btn-ghost btn-inline" onClick={onClose} aria-label="Fermer">Fermer</button>
         </div>
 
